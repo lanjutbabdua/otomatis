@@ -1,4 +1,4 @@
-name: Auto Publish WP Self-Hosted to WP.com Daily
+name: Auto Publish gudang cerita Self-Hosted to WP.com Daily
 
 on:
   schedule:
