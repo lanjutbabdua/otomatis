@@ -12,18 +12,18 @@ import markdown # Markdown tetap diperlukan untuk konversi ke HTML
 # INI ADALAH URL API WORDPRESS SELF-HOSTED KAMU (SUMBER ARTIKEL)
 API_BASE_URL_SELF_HOSTED = "https://kingquizzes.com/wp-json/wp/v2/posts"
 
-# INI ADALAH URL API WORDPRESS.COM KAMU (TUJUAN ARTIKEL)
 # Ganti YOUR_WORDPRESS_COM_SITE_SLUG dengan slug situs WordPress.com kamu (contoh: 'myawesomeblog')
-# ATAU jika kamu punya custom domain di WordPress.com: "https://public-api.wordpress.com/rest/v1.1/sites/yourcustomdomain.com/posts/new"
-WORDPRESS_COM_PUBLISH_URL = "https://public-api.wordpress.com/rest/v1.1/sites/bursaceritahot.wordpress.com/posts/new"
+# ATAU jika kamu punya custom domain di WordPress.com: "yourcustomdomain.com"
+WORDPRESS_COM_BLOG_IDENTIFIER = os.getenv("marwanmedias.wordpress.com") 
+
+# Endpoint untuk publikasi ke WordPress.com. Akan dibentuk dengan WORDPRESS_COM_BLOG_IDENTIFIER
+WORDPRESS_COM_PUBLISH_BASE_URL = "https://public-api.wordpress.com/rest/v1.1/sites/"
 
 STATE_FILE = 'published_posts.json' # File untuk melacak postingan yang sudah diterbitkan
 RANDOM_IMAGES_FILE = 'random_images.json' # File untuk URL gambar acak
 
-# --- Konfigurasi WordPress.com (Untuk PUBLISH, Menggunakan OAuth 2.0) ---
-WORDPRESS_COM_CLIENT_ID = os.getenv("WORDPRESS_COM_CLIENT_ID")
-WORDPRESS_COM_CLIENT_SECRET = os.getenv("WORDPRESS_COM_CLIENT_SECRET")
-WORDPRESS_COM_REFRESH_TOKEN = os.getenv("WORDPRESS_COM_REFRESH_TOKEN") # Refresh token WordPress.com
+# --- Konfigurasi WordPress.com (Untuk PUBLISH, Menggunakan Access Token Langsung) ---
+WORDPRESS_COM_ACCESS_TOKEN = os.getenv("soFFpv*$xVc#sXF5IwwOM(gxu#wxcC8OnGX4#v5OR(z7t#!J#vC#KSmNs3@y(fYM")
 
 # --- Penggantian Kata Khusus ---
 REPLACEMENT_MAP = {
@@ -38,6 +38,92 @@ REPLACEMENT_MAP = {
 }
 
 # === Utilitas ===
+
+def insert_more_tag(content_html, word_limit=100):
+    """
+    Menyisipkan tag di sekitar batas kata yang ditentukan dalam konten HTML.
+    Akan mencari lokasi yang "aman" seperti setelah tag penutup paragraf atau baris baru.
+    """
+    words = content_html.split()
+    if len(words) <= word_limit:
+        return content_html # Tidak perlu menyisipkan jika konten terlalu pendek
+
+    preview_content = " ".join(words[:word_limit])
+    
+    insert_pos = -1
+    
+    # Prioritaskan untuk menyisipkan setelah penutup tag paragraf jika ada di sekitar batas
+    match = re.search(r'<\/p>', preview_content)
+    if match:
+        insert_pos = content_html.find(match.group(0), 0, len(preview_content)) + len(match.group(0))
+    else:
+        # Jika tidak ada paragraf penutup, cari spasi terdekat setelah batas kata
+        space_after_limit = content_html.find(' ', len(preview_content))
+        if space_after_limit != -1:
+            insert_pos = space_after_limit
+        else:
+            insert_pos = len(preview_content) # Fallback: potong di akhir kata ke-100
+
+    if insert_pos != -1:
+        return content_html[:insert_pos].strip() + "\n\n" + content_html[insert_pos:].strip()
+    
+    return content_html # Fallback jika gagal menyisipkan dengan rapi
+
+def wrap_content_in_details_tag(content_html, article_url, article_title, word_limit=700):
+    """
+    Menyisipkan tag <details> dan <summary> untuk menyembunyikan sisa konten
+    setelah batas kata yang ditentukan, dengan tautan URL dan judul artikel di summary.
+    """
+    words = content_html.split()
+    if len(words) <= word_limit:
+        return content_html # Tidak perlu menyembunyikan jika konten terlalu pendek
+
+    # Pisahkan konten menjadi bagian preview dan bagian tersembunyi
+    # Kita tidak perlu secara eksplisit membuat preview_part dan hidden_part
+    # Kita hanya perlu menemukan titik potong di content_html asli
+    
+    # Cari posisi karakter untuk word_limit
+    temp_preview_words = " ".join(words[:word_limit])
+    insert_point_char = len(temp_preview_words)
+    
+    # Pastikan kita tidak memotong tag HTML atau kata
+    safe_insert_pos = -1
+    
+    # Coba cari tag penutup paragraf atau div di sekitar batas kata
+    # Batasi pencarian agar tidak terlalu jauh
+    search_end_pos = min(len(content_html), insert_point_char + 200) # Cari dalam 200 karakter berikutnya
+    match = re.search(r'(<\/\w+>)\s*(<\w+[^>]*>)?', content_html[insert_point_char:search_end_pos], re.IGNORECASE)
+    
+    if match:
+        safe_insert_pos = content_html.find(match.group(0), insert_point_char) + len(match.group(0))
+    else:
+        # Jika tidak ada tag penutup, cari spasi terdekat setelah batas kata
+        space_pos = content_html.find(' ', insert_point_char)
+        if space_pos != -1:
+            safe_insert_pos = space_pos
+        else:
+            safe_insert_pos = insert_point_char # Fallback: potong di akhir karakter ke-700
+    
+    if safe_insert_pos != -1:
+        part_before_details = content_html[:safe_insert_pos].strip()
+        part_inside_details = content_html[safe_insert_pos:].strip()
+        
+        # Bentuk teks summary sesuai permintaan
+        # Escape HTML entities di judul untuk mencegah masalah rendering
+        escaped_title = article_title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#039;')
+        
+        details_summary_html = f"<summary><a href='https://shrinkearn.com/st?api=bd1828880f4bb9d0e34fed8fc3214e4cc14959ad&url={article_url}' rel='nofollow' target='_blank'>Lanjut bab 2: {escaped_title}</a></summary>"
+        
+        # Gabungkan semua bagian
+        return (
+            f"{part_before_details}\n"
+            f"<details>{details_summary_html}\n"
+            f"<div id=\"lanjut\">\n{part_inside_details}\n</div>\n"
+            f"</details>\n"
+        )
+    
+    return content_html # Fallback jika gagal menyisipkan dengan rapi
+
 
 def extract_first_image_url(html_content):
     """
@@ -124,42 +210,15 @@ def get_random_image_url(image_urls):
         return random.choice(image_urls)
     return None
 
-# --- Otentikasi WordPress.com ---
-
-def get_wordpress_com_access_token():
-    """
-    Menggunakan refresh token WordPress.com untuk mendapatkan token akses baru.
-    """
-    if not all([WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, WORDPRESS_COM_REFRESH_TOKEN]):
-        raise ValueError(
-            "WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, dan WORDPRESS_COM_REFRESH_TOKEN "
-            "variabel lingkungan harus disetel untuk otentikasi WordPress.com OAuth."
-        )
-
-    token_url = "https://public-api.wordpress.com/oauth2/token"
-    payload = {
-        'grant_type': 'refresh_token',
-        'refresh_token': WORDPRESS_COM_REFRESH_TOKEN,
-        'client_id': WORDPRESS_COM_CLIENT_ID,
-        'client_secret': WORDPRESS_COM_CLIENT_SECRET
-    }
-
-    try:
-        response = requests.post(token_url, data=payload)
-        response.raise_for_status() # Akan menimbulkan HTTPError untuk status kode 4xx/5xx
-        return response.json()['access_token']
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Gagal mendapatkan token akses WordPress.com: {e}")
-        print("Pastikan WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, dan WORDPRESS_COM_REFRESH_TOKEN Anda valid.")
-        raise
-
 # --- Penerbitan Artikel ke WordPress.com ---
 
-def publish_post_to_wordpress_com(access_token, title, content_html, categories=None, tags=None, random_image_url=None):
+def publish_post_to_wordpress_com(access_token, blog_identifier, title, content_html, categories=None, tags=None, random_image_url=None):
     """
     Menerbitkan postingan ke WordPress.com.
     """
     print(f"🚀 Menerbitkan '{title}' ke WordPress.com...")
+
+    publish_url = f"{WORDPRESS_COM_PUBLISH_BASE_URL}{blog_identifier}/posts/new"
 
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -173,26 +232,66 @@ def publish_post_to_wordpress_com(access_token, title, content_html, categories=
         content_html = image_html + "\n" + content_html
         print(f"🖼️ Gambar acak '{random_image_url}' ditambahkan ke artikel.")
 
+    # 1. SISIPKAN DI SINI (jika diperlukan)
+    content_after_more_tag = insert_more_tag(content_html, word_limit=100)
+    
+    # 2. SISIPKAN <details> DI SINI (jika diperlukan), sekarang dengan URL dan judul
+    # Untuk URL saat ini, kita bisa menggunakan URL dari post yang BARU diterbitkan jika API WordPress.com mengembalikannya.
+    # Namun, karena kita memanggil ini SEBELUM post diterbitkan, kita belum punya URL finalnya.
+    # Alternatif: gunakan URL yang bisa diprediksi atau biarkan link kosong jika tidak bisa diprediksi.
+    # Untuk tujuan ini, kita akan melewati URL_SAAT_INI, karena itu hanya akan tersedia SETELAH post berhasil dibuat.
+    # Paling aman, kita bisa gunakan URL API sumber (self-hosted) sebagai placeholder atau tidak mengisi href jika memang tidak ada URL final WordPress.com.
+    # Tapi, jika maksudmu adalah URL artikel yang sedang diproses di WordPress.com, API WordPress.com akan mengembalikannya setelah berhasil diterbitkan.
+    # Untuk saat ini, kita akan biarkan URL kosong atau menggunakan placeholder.
+    # Karena kita ingin "URL saat ini" di WordPress.com, kita perlu mendapatkannya setelah publikasi berhasil.
+    # Jadi, kita tidak bisa langsung memasukkan URL spesifik artikel yang akan dibuat saat ini.
+    # Mungkin maksudmu adalah URL dari artikel sumber (kingquizzes.com)?
+    # Untuk keamanan, kita akan biarkan ini dulu tanpa URL, atau kita perlu informasi URL dari post yang baru dibuat.
+    
+    # KARENA URL AKAN DIDAPATKAN SETELAH PUBLIKASI, KITA TIDAK BISA LANGSUNG MEMASUKKANNYA DI SINI.
+    # Kita bisa:
+    # 1. Biarkan href="" atau href="#"
+    # 2. Asumsi URL bisa diprediksi dari slug/judul (tidak selalu akurat di WP.com)
+    # 3. Lakukan update post setelah publikasi pertama (lebih kompleks)
+    
+    # Untuk tujuan ini, saya akan menggunakan URL dari API_BASE_URL_SELF_HOSTED sebagai placeholder
+    # atau jika memang ada field 'link' dari API self-hosted, kita bisa gunakan itu.
+    # Untuk 'judul artikel', kita pakai processed_title.
+    
+    # Ambil URL sumber dari post, jika tersedia
+    # Perlu diingat, 'link' biasanya ada di respons dari API sumber
+    # Jika tidak ada, kamu harus menyesuaikan ini
+    source_article_url = 'https://kingquizzes.com' # Placeholder jika tidak ada link dari API
+    # Asumsi fetch_all_and_process_posts_from_self_hosted menambahkan 'link' ke post dict
+    # post.get('link', 'https://kingquizzes.com')
+
+    final_content_for_publish = wrap_content_in_details_tag(
+        content_after_more_tag, 
+        article_url=source_article_url, # Gunakan URL sumber sebagai placeholder atau URL yang relevan
+        article_title=title, # Judul artikel yang sedang diproses
+        word_limit=700
+    )
+    
     payload = {
         'title': title,
-        'content': content_html,
+        'content': final_content_for_publish, 
         'status': 'publish' # Bisa diubah ke 'draft' jika ingin meninjau dulu
     }
 
     if categories:
-        payload['categories'] = {cat: True for cat in categories} # WordPress.com API expects this format
+        payload['categories'] = {cat: True for cat in categories}
     if tags:
-        payload['tags'] = {tag: True for tag in tags} # WordPress.com API expects this format
+        payload['tags'] = {tag: True for tag in tags}
 
     try:
-        response = requests.post(WORDPRESS_COM_PUBLISH_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status() # Tangani error HTTP
+        response = requests.post(publish_url, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
         response_data = response.json()
         print(f"✅ Artikel '{title}' berhasil diterbitkan ke WordPress.com! URL: {response_data.get('URL')}")
         return response_data
     except requests.exceptions.RequestException as e:
         print(f"❌ Gagal menerbitkan artikel '{title}' ke WordPress.com: {e}")
-        if response.status_code == 409: # Conflict, mungkin post dengan judul/konten serupa sudah ada
+        if response.status_code == 409:
             print("Peringatan: Mungkin artikel ini sudah ada di WordPress.com. Coba cek secara manual.")
         return None
 
@@ -218,7 +317,7 @@ def fetch_all_and_process_posts_from_self_hosted():
             'per_page': per_page_limit,
             'page': page,
             'status': 'publish',
-            '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media'
+            '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media,link' # Tambahkan 'link' untuk URL sumber
         }
         try:
             res = requests.get(API_BASE_URL_SELF_HOSTED, params=params, headers=headers, timeout=30)
@@ -232,7 +331,7 @@ def fetch_all_and_process_posts_from_self_hosted():
                                      f"Pastikan URL API Anda benar dan dapat diakses.")
             elif res.status_code != 200:
                 raise Exception(f"Error: Gagal mengambil data dari WordPress self-hosted REST API: {res.status_code} - {res.text}. "
-                                f"Pastikan URL API Anda benar dan dapat diakses.")
+                                 f"Pastikan URL API Anda benar dan dapat diakses.")
 
             posts_batch = res.json()
 
@@ -242,7 +341,7 @@ def fetch_all_and_process_posts_from_self_hosted():
 
             all_posts_raw.extend(posts_batch)
             page += 1
-            time.sleep(0.5)
+            time.sleep(0.5) # Jeda sebentar untuk menghindari overloading server
 
         except requests.exceptions.Timeout:
             print(f"Timeout: Permintaan ke WordPress self-hosted API di halaman {page} habis waktu. Mungkin ada masalah jaringan atau server lambat.")
@@ -267,15 +366,11 @@ def fetch_all_and_process_posts_from_self_hosted():
 
         post['raw_cleaned_content'] = content_after_replacements
         post['id'] = post.get('id')
+        post['source_link'] = post.get('link') # Tambahkan link sumber ke data post
 
         # Ekstrak kategori dan tag
-        # Perlu dicatat: WordPress.com API membutuhkan NAMA kategori/tag, bukan ID.
-        # Untuk mendapatkan nama, kamu perlu membuat permintaan tambahan ke API self-hosted
-        # untuk /wp/v2/categories dan /wp/v2/tags.
-        # Untuk percobaan awal, saya akan meninggalkan ini kosong atau gunakan ID sebagai placeholder.
-        # Jika kamu ingin kategori/tag yang akurat, kamu harus mengimplementasikan pemetaan ID ke nama.
-        post['category_names'] = []
-        post['tag_names'] = []
+        post['category_names'] = [] # Isi ini jika kamu mapping ID ke nama
+        post['tag_names'] = []      # Isi ini jika kamu mapping ID ke nama
 
         processed_posts.append(post)
 
@@ -284,17 +379,25 @@ def fetch_all_and_process_posts_from_self_hosted():
 # --- Eksekusi Utama ---
 
 if __name__ == '__main__':
-    print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress self-hosted to WordPress.com publishing process...")
+    print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress self-hosted to WordPress.com publishing process (Batch Mode)...")
     print("🚀 Mengambil semua artikel WordPress self-hosted.")
-    print("🤖 Fitur Pengeditan 300 Kata Pertama oleh Gemini AI DINONAKTIFKAN.") # Notifikasi perubahan
+    print("🤖 Fitur Pengeditan 300 Kata Pertama oleh Gemini AI DINONAKTIFKAN.")
     print("🖼️ Mencoba mengambil gambar pertama dari konten artikel.")
-    print("Directly publishing to WordPress.com.")
+    print("Directly publishing ALL available articles to WordPress.com.")
+    print("📝 Menyisipkan di sekitar 100 kata pertama setiap artikel.")
+    print("🔽 Menyisipkan <details> dengan link judul artikel sumber setelah 700 kata pertama setiap artikel.")
 
-    # Validasi lingkungan untuk WordPress.com (Tujuan)
-    if not all([WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, WORDPRESS_COM_REFRESH_TOKEN]):
-        print("❌ Error: Variabel lingkungan WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, atau WORDPRESS_COM_REFRESH_TOKEN tidak disetel.")
-        print("Pastikan Anda sudah mendapatkan kredensial OAuth 2.0 dari WordPress.com.")
-        exit()
+
+    # Validasi variabel lingkungan yang dibutuhkan
+    required_env_vars = ["WORDPRESS_COM_ACCESS_TOKEN", "WORDPRESS_COM_BLOG_IDENTIFIER"]
+    for var in required_env_vars:
+        if not os.getenv(var):
+            print(f"❌ Error: Variabel lingkungan '{var}' tidak disetel.")
+            print("Pastikan Anda sudah mendapatkan access token dan blog identifier dari WordPress.com dan menyetelnya sebagai variabel lingkungan.")
+            exit()
+
+    wpcom_access_token = os.getenv("WORDPRESS_COM_ACCESS_TOKEN")
+    wordpress_com_blog_identifier = os.getenv("WORDPRESS_COM_BLOG_IDENTIFIER")
 
     try:
         # 1. Muat daftar postingan yang sudah diterbitkan
@@ -303,60 +406,78 @@ if __name__ == '__main__':
 
         # 2. Muat URL gambar acak
         random_image_urls = load_image_urls(RANDOM_IMAGES_FILE)
-        selected_random_image = get_random_image_url(random_image_urls)
-        if not selected_random_image:
-            print("⚠️ Tidak ada URL gambar acak yang tersedia. Artikel akan diterbitkan tanpa gambar acak.")
-
+        
         # 3. Ambil semua postingan dari API WordPress self-hosted dan lakukan pre-processing
         all_posts_preprocessed = fetch_all_and_process_posts_from_self_hosted()
         print(f"Total {len(all_posts_preprocessed)} artikel ditemukan dan diproses awal dari WordPress self-hosted API.")
 
         # 4. Filter postingan yang belum diterbitkan
+        # Pastikan kita membandingkan string untuk ID
         unpublished_posts = [post for post in all_posts_preprocessed if str(post['id']) not in published_ids]
-        print(f"Ditemukan {len(unpublished_posts)} artikel yang belum diterbitkan.")
+        print(f"Ditemukan {len(unpublished_posts)} artikel yang belum diterbitkan yang akan diproses.")
 
         if not unpublished_posts:
-            print("\n🎉 Tidak ada artikel baru yang tersedia untuk diterbitkan hari ini. Proses selesai.")
+            print("\n🎉 Tidak ada artikel baru yang tersedia untuk diterbitkan. Proses selesai.")
             exit()
 
-        # 5. Urutkan postingan yang belum diterbitkan dari yang TERBARU
+        # 5. Urutkan postingan yang belum diterbitkan (misalnya, dari yang TERBARU)
         unpublished_posts.sort(key=lambda x: datetime.datetime.fromisoformat(x['date'].replace('Z', '+00:00')), reverse=True)
 
-        # 6. Pilih satu postingan untuk diterbitkan hari ini
-        post_to_publish = unpublished_posts[0]
+        successful_publications = 0
+        failed_publications = 0
 
-        print(f"🌟 Memproses dan menerbitkan artikel berikutnya: '{post_to_publish.get('processed_title')}' (ID: {post_to_publish.get('id')})")
+        # 6. Iterasi dan terbitkan setiap postingan yang belum diterbitkan
+        for post_to_publish in unpublished_posts:
+            original_post_id = post_to_publish.get('id')
+            processed_title = post_to_publish.get('processed_title')
+            source_article_url = post_to_publish.get('source_link', '#') # Ambil link sumber, fallback ke '#'
+            final_processed_content = post_to_publish['raw_cleaned_content']
+            
+            # Konversi konten akhir ke HTML untuk WordPress.com
+            final_content_html = markdown.markdown(final_processed_content)
 
-        # Konten akhir langsung dari hasil pembersihan dan penggantian kata
-        final_processed_content = post_to_publish['raw_cleaned_content']
-        # Convert final content to HTML for WordPress.com
-        final_content_html = markdown.markdown(final_processed_content)
+            # Ambil gambar acak UNTUK SETIAP postingan (jika mode batch)
+            selected_random_image = get_random_image_url(random_image_urls)
+            if not selected_random_image:
+                print(f"⚠️ Tidak ada URL gambar acak yang tersedia untuk artikel '{processed_title}'.")
 
+            print(f"\n🌟 Memproses artikel: '{processed_title}' (ID Sumber: {original_post_id})")
 
-        # 7. Dapatkan token akses WordPress.com
-        wpcom_access_token = get_wordpress_com_access_token()
-
-        # 8. Terbitkan ke WordPress.com
-        if wpcom_access_token:
-            publish_post_to_wordpress_com(
+            # 7. Terbitkan ke WordPress.com
+            published_response = publish_post_to_wordpress_com(
                 wpcom_access_token,
-                post_to_publish['processed_title'],
-                final_content_html,
+                wordpress_com_blog_identifier,
+                processed_title,
+                final_content_html, 
                 categories=post_to_publish['category_names'],
                 tags=post_to_publish['tag_names'],
-                random_image_url=selected_random_image
+                random_image_url=selected_random_image,
+                # Teruskan URL sumber dan judul ke fungsi publish_post_to_wordpress_com
+                # untuk digunakan di wrap_content_in_details_tag
+                article_url_for_details=source_article_url, 
+                article_title_for_details=processed_title
             )
-        else:
-            print("Skipping WordPress.com publishing: Gagal mendapatkan token akses WordPress.com.")
 
-        # 9. Tambahkan ID postingan ke daftar yang sudah diterbitkan dan simpan state
-        published_ids.add(str(post_to_publish['id']))
-        save_published_posts_state(published_ids)
-        print(f"✅ State file '{STATE_FILE}' diperbarui.")
+            if published_response:
+                successful_publications += 1
+                # 8. Tambahkan ID postingan ke daftar yang sudah diterbitkan dan simpan state
+                published_ids.add(str(original_post_id))
+                save_published_posts_state(published_ids)
+                print(f"✅ State file '{STATE_FILE}' diperbarui dengan ID: {original_post_id}.")
+            else:
+                failed_publications += 1
+                print(f"❌ Gagal menerbitkan artikel ID Sumber: {original_post_id}. Tidak ditambahkan ke state file.")
+            
+            time.sleep(random.uniform(2, 5)) # Jeda acak antar postingan untuk menghindari rate limiting
 
-        print("\n🎉 Proses Selesai! Artikel telah diterbitkan langsung ke WordPress.com.")
+        print(f"\n--- Proses Batch Selesai ---")
+        print(f"Total artikel diproses dari sumber: {len(all_posts_preprocessed)}")
+        print(f"Artikel baru yang ditemukan: {len(unpublished_posts)}")
+        print(f"✅ Berhasil diterbitkan ke WordPress.com: {successful_publications}")
+        print(f"❌ Gagal diterbitkan ke WordPress.com: {failed_publications}")
+        print("\n🎉 Proses Batch Selesai!")
 
     except Exception as e:
-        print(f"❌ Terjadi kesalahan fatal: {e}")
+        print(f"❌ Terjadi kesalahan fatal selama proses: {e}")
         import traceback
         traceback.print_exc()
