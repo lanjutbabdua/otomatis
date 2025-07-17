@@ -1,0 +1,53 @@
+name: WordPress Self-Hosted to WordPress.com Publisher
+
+on:
+  workflow_dispatch: # Memungkinkan kamu menjalankan workflow ini secara manual dari GitHub Actions tab
+  schedule:
+    # Jadwal untuk menjalankan setiap hari pada pukul 03:00 UTC (jam 10:00 WIB)
+    # Kamu bisa sesuaikan waktu sesuai kebutuhan. Gunakan https://crontab.guru/ untuk bantuan.
+    - cron: '0 3 * * *'
+
+jobs:
+  publish_post:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # Atau versi Python spesifik yang kamu gunakan, misal '3.10'
+
+    - name: Install Dependencies
+      run: pip install requests markdown google-generativeai # Hapus google-generativeai jika kamu sudah hapus semua kode Gemini
+
+    - name: Create random_images.json (if not exists)
+      run: |
+        if [ ! -f random_images.json ]; then
+          echo '[]' > random_images.json
+          echo "Created an empty random_images.json file."
+        fi
+
+    - name: Run Publisher Script
+      env:
+        # Kredensial Gemini API (dinonaktifkan sementara, tapi bisa dihidupkan lagi)
+        # GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+        # Kredensial WordPress.com OAuth
+        WORDPRESS_COM_CLIENT_ID: ${{ secrets.WORDPRESS_COM_CLIENT_ID }}
+        WORDPRESS_COM_CLIENT_SECRET: ${{ secrets.WORDPRESS_COM_CLIENT_SECRET }}
+        WORDPRESS_COM_REFRESH_TOKEN: ${{ secrets.WORDPRESS_COM_REFRESH_TOKEN }}
+        # Ganti YOUR_WORDPRESS_COM_SITE_SLUG dengan slug situs WordPress.com kamu di dalam skrip Python!
+        # Contoh: https://public-api.wordpress.com/rest/v1.1/sites/myawesomeblog.wordpress.com/posts/new
+      run: python otomatis.py
+
+    - name: Commit and Push updated published_posts.json
+      # Langkah ini penting agar status postingan yang sudah diterbitkan tersimpan
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add published_posts.json
+        git commit -m "Update published posts state" || echo "No changes to commit"
+        git push
