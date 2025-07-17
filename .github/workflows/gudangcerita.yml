@@ -1,0 +1,76 @@
+name: Auto Publish WP Self-Hosted to WP.com Daily
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC (07:00 AM WIB, mengingat Sukabumi GMT+7)
+    # Sesuaikan '0 0 * * *' jika kamu ingin waktu lain dalam format Cron.
+    # Kamu bisa pakai https://crontab.guru/ untuk bantuan.
+    - cron: '0 0 * * *' # Setiap hari pukul 00:00 UTC
+
+  workflow_dispatch: # Memungkinkan kamu menjalankan workflow secara manual dari tab Actions di GitHub
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # Atau versi Python spesifik yang kamu mau, misal '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip # Pastikan pip terbaru
+        # Instal semua dependensi yang dibutuhkan otomatis.py: requests dan markdown
+        pip install requests markdown
+
+    - name: Create required files if they don't exist
+      run: |
+        # Pastikan published_posts.json ada
+        if [ ! -f published_posts.json ]; then
+          echo '[]' > published_posts.json
+          echo "Created an empty published_posts.json file."
+        fi
+        # Pastikan random_images.json ada
+        if [ ! -f random_images.json ]; then
+          echo '[]' > random_images.json
+          echo "Created an empty random_images.json file."
+        fi
+
+    - name: Run otomatis.py script
+      env:
+        # Rahasia ini HARUS kamu tambahkan di Settings -> Secrets -> Actions di repo GitHub-mu.
+        # Ini adalah kredensial WordPress.com OAuth (bukan Blogger lagi)
+        WORDPRESS_COM_CLIENT_ID: ${{ secrets.WORDPRESS_COM_CLIENT_ID }}
+        WORDPRESS_COM_CLIENT_SECRET: ${{ secrets.WORDPRESS_COM_CLIENT_SECRET }}
+        WORDPRESS_COM_REFRESH_TOKEN: ${{ secrets.WORDPRESS_COM_REFRESH_TOKEN }}
+        # Jika nanti ingin pakai Gemini lagi, uncomment dan tambahkan secret ini
+        # GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: python gudangcerita.py # Sudah disesuaikan dengan nama file Python-mu
+
+    - name: Commit and push updated published_posts.json
+      # Ini penting untuk menyimpan state postingan yang sudah diterbitkan.
+      # Logika ditingkatkan agar tidak error jika tidak ada perubahan atau file belum ada di awal.
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        
+        # Tambahkan file ke staging area
+        git add published_posts.json
+
+        # Cek apakah ada perubahan yang perlu di-commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit in published_posts.json."
+        else
+          # Commit jika ada perubahan
+          git commit -m "Update published posts state"
+          # Push perubahan ke remote repository
+          git push
+        fi
+      # Gunakan 'continue-on-error: true' untuk tahap ini di awal
+      # agar workflow tidak langsung gagal jika file belum ada atau ada masalah Git lainnya.
+      # Setelah yakin berjalan lancar, bisa dihapus.
+      continue-on-error: true
