@@ -4,7 +4,7 @@ import re
 import json
 import datetime
 import time
-import random 
+import random
 import markdown # Markdown tetap diperlukan untuk konversi ke HTML
 
 
@@ -77,8 +77,6 @@ def replace_custom_words(text):
         pattern = re.compile(re.escape(old_word), re.IGNORECASE)
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
-
-# Fungsi edit_first_300_words_with_gemini dihapus
 
 # --- Fungsi untuk memuat dan menyimpan status postingan yang sudah diterbitkan ---
 def load_published_posts_state():
@@ -229,8 +227,9 @@ def fetch_all_and_process_posts_from_self_hosted():
             '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media'
         }
         try:
+            # Baris 129 yang diperbaiki:
             res = requests.get(API_BASE_URL_SELF_HOSTED, params=params, headers=headers, timeout=30)
-            
+
             if res.status_code == 400:
                 if "rest_post_invalid_page_number" in res.text:
                     print(f"Reached end of posts from WordPress self-hosted API (page {page} does not exist). Stopping fetch.")
@@ -266,7 +265,7 @@ def fetch_all_and_process_posts_from_self_hosted():
         post['processed_title'] = processed_title
 
         raw_content = post.get('content', {}).get('rendered', '')
-        content_image_url = extract_first_image_url(raw_content) 
+        content_image_url = extract_first_image_url(raw_content)
         post['content_image_url'] = content_image_url
 
         content_no_anchors = remove_anchor_tags(raw_content)
@@ -275,15 +274,15 @@ def fetch_all_and_process_posts_from_self_hosted():
 
         post['raw_cleaned_content'] = content_after_replacements
         post['id'] = post.get('id')
-        
+
         # Ekstrak kategori dan tag
         # Perlu dicatat: WordPress.com API membutuhkan NAMA kategori/tag, bukan ID.
         # Untuk mendapatkan nama, kamu perlu membuat permintaan tambahan ke API self-hosted
         # untuk /wp/v2/categories dan /wp/v2/tags.
         # Untuk percobaan awal, saya akan meninggalkan ini kosong atau gunakan ID sebagai placeholder.
         # Jika kamu ingin kategori/tag yang akurat, kamu harus mengimplementasikan pemetaan ID ke nama.
-        post['category_names'] = [] 
-        post['tag_names'] = [] 
+        post['category_names'] = []
+        post['tag_names'] = []
 
         processed_posts.append(post)
 
@@ -352,8 +351,8 @@ if __name__ == '__main__':
                 wpcom_access_token,
                 post_to_publish['processed_title'],
                 final_content_html,
-                categories=post_to_publish['category_names'], 
-                tags=post_to_publish['tag_names'],           
+                categories=post_to_publish['category_names'],
+                tags=post_to_publish['tag_names'],
                 random_image_url=selected_random_image
             )
         else:
