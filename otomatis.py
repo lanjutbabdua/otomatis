@@ -14,7 +14,7 @@ API_BASE_URL_SELF_HOSTED = "https://kingquizzes.com/wp-json/wp/v2/posts"
 
 # INI ADALAH URL API WORDPRESS.COM KAMU (TUJUAN ARTIKEL)
 # Ganti YOUR_WORDPRESS_COM_SITE_SLUG dengan slug situs WordPress.com kamu (contoh: 'myawesomeblog')
-# ATAU jika kamu punya custom domain di WordPress.com: "https://public-api.wordpress.com/rest/v1.1/sites/yourcustomdomain.com/posts"
+# ATAU jika kamu punya custom domain di WordPress.com: "https://public-api.wordpress.com/rest/v1.1/sites/yourcustomdomain.com/posts/new"
 WORDPRESS_COM_PUBLISH_URL = "https://public-api.wordpress.com/rest/v1.1/sites/bursaceritahot.wordpress.com/posts/new"
 
 STATE_FILE = 'published_posts.json' # File untuk melacak postingan yang sudah diterbitkan
@@ -124,9 +124,7 @@ def get_random_image_url(image_urls):
         return random.choice(image_urls)
     return None
 
----
-## Otentikasi WordPress.com
----
+# --- Otentikasi WordPress.com ---
 
 def get_wordpress_com_access_token():
     """
@@ -155,9 +153,7 @@ def get_wordpress_com_access_token():
         print("Pastikan WORDPRESS_COM_CLIENT_ID, WORDPRESS_COM_CLIENT_SECRET, dan WORDPRESS_COM_REFRESH_TOKEN Anda valid.")
         raise
 
----
-## Penerbitan Artikel ke WordPress.com
----
+# --- Penerbitan Artikel ke WordPress.com ---
 
 def publish_post_to_wordpress_com(access_token, title, content_html, categories=None, tags=None, random_image_url=None):
     """
@@ -200,9 +196,7 @@ def publish_post_to_wordpress_com(access_token, title, content_html, categories=
             print("Peringatan: Mungkin artikel ini sudah ada di WordPress.com. Coba cek secara manual.")
         return None
 
----
-## Pengambilan Artikel dari WordPress Self-Hosted (Sumber)
----
+# --- Pengambilan Artikel dari WordPress Self-Hosted (Sumber) ---
 
 def fetch_all_and_process_posts_from_self_hosted():
     """
@@ -227,7 +221,6 @@ def fetch_all_and_process_posts_from_self_hosted():
             '_fields': 'id,title,content,excerpt,categories,tags,date,featured_media'
         }
         try:
-            # Baris 129 yang diperbaiki:
             res = requests.get(API_BASE_URL_SELF_HOSTED, params=params, headers=headers, timeout=30)
 
             if res.status_code == 400:
@@ -288,9 +281,7 @@ def fetch_all_and_process_posts_from_self_hosted():
 
     return processed_posts
 
----
-## Eksekusi Utama
----
+# --- Eksekusi Utama ---
 
 if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress self-hosted to WordPress.com publishing process...")
