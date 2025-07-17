@@ -7,14 +7,13 @@ import time
 import random
 import markdown # Markdown tetap diperlukan untuk konversi ke HTML
 
-
 # --- Konfigurasi ---
 # INI ADALAH URL API WORDPRESS SELF-HOSTED KAMU (SUMBER ARTIKEL)
 API_BASE_URL_SELF_HOSTED = "https://kingquizzes.com/wp-json/wp/v2/posts"
 
-# Ganti YOUR_WORDPRESS_COM_SITE_SLUG dengan slug situs WordPress.com kamu (contoh: 'myawesomeblog')
-# ATAU jika kamu punya custom domain di WordPress.com: "yourcustomdomain.com"
-WORDPRESS_COM_BLOG_IDENTIFIER = os.getenv("marwanmedias.wordpress.com") 
+# Ganti langsung dengan blog identifier WordPress.com kamu
+# Contoh: "marwanmedias.wordpress.com" atau "yourcustomdomain.com"
+WORDPRESS_COM_BLOG_IDENTIFIER = "marwanmedias.wordpress.com" 
 
 # Endpoint untuk publikasi ke WordPress.com. Akan dibentuk dengan WORDPRESS_COM_BLOG_IDENTIFIER
 WORDPRESS_COM_PUBLISH_BASE_URL = "https://public-api.wordpress.com/rest/v1.1/sites/"
@@ -23,7 +22,8 @@ STATE_FILE = 'published_posts.json' # File untuk melacak postingan yang sudah di
 RANDOM_IMAGES_FILE = 'random_images.json' # File untuk URL gambar acak
 
 # --- Konfigurasi WordPress.com (Untuk PUBLISH, Menggunakan Access Token Langsung) ---
-WORDPRESS_COM_ACCESS_TOKEN = os.getenv("soFFpv*$xVc#sXF5IwwOM(gxu#wxcC8OnGX4#v5OR(z7t#!J#vC#KSmNs3@y(fYM")
+# MASUKKAN ACCESS TOKEN KAMU LANGSUNG DI SINI
+WORDPRESS_COM_ACCESS_TOKEN = "soFFpv*$xVc#sXF5IwwOM(gxu#wxcC8OnGX4#v5OR(z7t#!J#vC#KSmNs3@y(fYM"
 
 # --- Penggantian Kata Khusus ---
 REPLACEMENT_MAP = {
@@ -78,10 +78,6 @@ def wrap_content_in_details_tag(content_html, article_url, article_title, word_l
     if len(words) <= word_limit:
         return content_html # Tidak perlu menyembunyikan jika konten terlalu pendek
 
-    # Pisahkan konten menjadi bagian preview dan bagian tersembunyi
-    # Kita tidak perlu secara eksplisit membuat preview_part dan hidden_part
-    # Kita hanya perlu menemukan titik potong di content_html asli
-    
     # Cari posisi karakter untuk word_limit
     temp_preview_words = " ".join(words[:word_limit])
     insert_point_char = len(temp_preview_words)
@@ -112,6 +108,7 @@ def wrap_content_in_details_tag(content_html, article_url, article_title, word_l
         # Escape HTML entities di judul untuk mencegah masalah rendering
         escaped_title = article_title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#039;')
         
+        # Menggunakan shrinkearn.com link
         details_summary_html = f"<summary><a href='https://shrinkearn.com/st?api=bd1828880f4bb9d0e34fed8fc3214e4cc14959ad&url={article_url}' rel='nofollow' target='_blank'>Lanjut bab 2: {escaped_title}</a></summary>"
         
         # Gabungkan semua bagian
@@ -212,7 +209,7 @@ def get_random_image_url(image_urls):
 
 # --- Penerbitan Artikel ke WordPress.com ---
 
-def publish_post_to_wordpress_com(access_token, blog_identifier, title, content_html, categories=None, tags=None, random_image_url=None):
+def publish_post_to_wordpress_com(access_token, blog_identifier, title, content_html, categories=None, tags=None, random_image_url=None, article_url_for_details=None, article_title_for_details=None):
     """
     Menerbitkan postingan ke WordPress.com.
     """
@@ -236,39 +233,10 @@ def publish_post_to_wordpress_com(access_token, blog_identifier, title, content_
     content_after_more_tag = insert_more_tag(content_html, word_limit=100)
     
     # 2. SISIPKAN <details> DI SINI (jika diperlukan), sekarang dengan URL dan judul
-    # Untuk URL saat ini, kita bisa menggunakan URL dari post yang BARU diterbitkan jika API WordPress.com mengembalikannya.
-    # Namun, karena kita memanggil ini SEBELUM post diterbitkan, kita belum punya URL finalnya.
-    # Alternatif: gunakan URL yang bisa diprediksi atau biarkan link kosong jika tidak bisa diprediksi.
-    # Untuk tujuan ini, kita akan melewati URL_SAAT_INI, karena itu hanya akan tersedia SETELAH post berhasil dibuat.
-    # Paling aman, kita bisa gunakan URL API sumber (self-hosted) sebagai placeholder atau tidak mengisi href jika memang tidak ada URL final WordPress.com.
-    # Tapi, jika maksudmu adalah URL artikel yang sedang diproses di WordPress.com, API WordPress.com akan mengembalikannya setelah berhasil diterbitkan.
-    # Untuk saat ini, kita akan biarkan URL kosong atau menggunakan placeholder.
-    # Karena kita ingin "URL saat ini" di WordPress.com, kita perlu mendapatkannya setelah publikasi berhasil.
-    # Jadi, kita tidak bisa langsung memasukkan URL spesifik artikel yang akan dibuat saat ini.
-    # Mungkin maksudmu adalah URL dari artikel sumber (kingquizzes.com)?
-    # Untuk keamanan, kita akan biarkan ini dulu tanpa URL, atau kita perlu informasi URL dari post yang baru dibuat.
-    
-    # KARENA URL AKAN DIDAPATKAN SETELAH PUBLIKASI, KITA TIDAK BISA LANGSUNG MEMASUKKANNYA DI SINI.
-    # Kita bisa:
-    # 1. Biarkan href="" atau href="#"
-    # 2. Asumsi URL bisa diprediksi dari slug/judul (tidak selalu akurat di WP.com)
-    # 3. Lakukan update post setelah publikasi pertama (lebih kompleks)
-    
-    # Untuk tujuan ini, saya akan menggunakan URL dari API_BASE_URL_SELF_HOSTED sebagai placeholder
-    # atau jika memang ada field 'link' dari API self-hosted, kita bisa gunakan itu.
-    # Untuk 'judul artikel', kita pakai processed_title.
-    
-    # Ambil URL sumber dari post, jika tersedia
-    # Perlu diingat, 'link' biasanya ada di respons dari API sumber
-    # Jika tidak ada, kamu harus menyesuaikan ini
-    source_article_url = 'https://kingquizzes.com' # Placeholder jika tidak ada link dari API
-    # Asumsi fetch_all_and_process_posts_from_self_hosted menambahkan 'link' ke post dict
-    # post.get('link', 'https://kingquizzes.com')
-
     final_content_for_publish = wrap_content_in_details_tag(
         content_after_more_tag, 
-        article_url=source_article_url, # Gunakan URL sumber sebagai placeholder atau URL yang relevan
-        article_title=title, # Judul artikel yang sedang diproses
+        article_url=article_url_for_details, 
+        article_title=article_title_for_details, 
         word_limit=700
     )
     
@@ -387,17 +355,17 @@ if __name__ == '__main__':
     print("📝 Menyisipkan di sekitar 100 kata pertama setiap artikel.")
     print("🔽 Menyisipkan <details> dengan link judul artikel sumber setelah 700 kata pertama setiap artikel.")
 
+    # Variabel tidak lagi diambil dari os.getenv()
+    wpcom_access_token = WORDPRESS_COM_ACCESS_TOKEN
+    wordpress_com_blog_identifier = WORDPRESS_COM_BLOG_IDENTIFIER
 
-    # Validasi variabel lingkungan yang dibutuhkan
-    required_env_vars = ["WORDPRESS_COM_ACCESS_TOKEN", "WORDPRESS_COM_BLOG_IDENTIFIER"]
-    for var in required_env_vars:
-        if not os.getenv(var):
-            print(f"❌ Error: Variabel lingkungan '{var}' tidak disetel.")
-            print("Pastikan Anda sudah mendapatkan access token dan blog identifier dari WordPress.com dan menyetelnya sebagai variabel lingkungan.")
-            exit()
-
-    wpcom_access_token = os.getenv("WORDPRESS_COM_ACCESS_TOKEN")
-    wordpress_com_blog_identifier = os.getenv("WORDPRESS_COM_BLOG_IDENTIFIER")
+    # Tidak perlu validasi os.getenv() lagi karena sudah disetel langsung
+    # required_env_vars = ["WORDPRESS_COM_ACCESS_TOKEN", "WORDPRESS_COM_BLOG_IDENTIFIER"]
+    # for var in required_env_vars:
+    #     if not os.getenv(var):
+    #         print(f"❌ Error: Variabel lingkungan '{var}' tidak disetel.")
+    #         print("Pastikan Anda sudah mendapatkan access token dan blog identifier dari WordPress.com dan menyetelnya sebagai variabel lingkungan.")
+    #         exit()
 
     try:
         # 1. Muat daftar postingan yang sudah diterbitkan
