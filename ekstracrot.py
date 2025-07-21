@@ -6,26 +6,24 @@ import time
 import random
 import re
 import markdown
-import google.generativeai as genai
+import google.generativeai as genai # Tetap diimpor tapi tidak dipanggil
 import unicodedata
 from urllib.parse import quote_plus
 
 # --- Konfigurasi ---
-API_SOURCE_URL = "https://ngesex.org/wp-json/wp/v2/posts"
+API_SOURCE_URL = "https://kisah69.blog/wp-json/wp/v2/posts"
 # WP_TARGET_API_URL yang sudah benar untuk ekstracrot.wordpress.com
 WP_TARGET_API_URL = "https://public-api.wordpress.com/rest/v1.1/sites/137050535/posts"
 STATE_FILE = 'artikel_terbit.json'
 RANDOM_IMAGES_FILE = 'random_images.json'
 
-# --- Konfigurasi Gemini API (Satu Key Saja) ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY_CONTENT environment variable not set. Please set it in your GitHub Secrets or local environment.")
-
-genai.configure(api_key=GEMINI_API_KEY)
-
-gemini_model_content = genai.GenerativeModel("gemini-1.5-flash")
-gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")
+# --- Konfigurasi Gemini AI (DINONAKTIFKAN SEMENTARA) ---
+# GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_TITLE")
+# if not GEMINI_API_KEY:
+#     raise ValueError("GEMINI_API_KEY_TITLE environment variable not set. Please set it in your GitHub Secrets or local environment.")
+# genai.configure(api_key=GEMINI_API_KEY)
+# gemini_model_content = genai.GenerativeModel("gemini-1.5-flash")
+# gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")
 
 # --- Konfigurasi Kredensial WordPress Target ---
 WP_USERNAME = os.getenv('WP_USERNAME')
@@ -85,74 +83,15 @@ def replace_custom_words(text):
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
 
+# Fungsi edit_title_with_gemini dinonaktifkan
 def edit_title_with_gemini(original_title):
-    print(f"🤖 Memulai pengeditan judul dengan Gemini AI (Model Judul): '{original_title}'...")
-    try:
-        prompt = (
-            f"Saya membutuhkan satu judul baru yang lebih menarik, tidak vulgar, dan tetap relevan dengan topik aslinya dan menggunakan kata Cerita Dewasa kedalamnya. "
-            f"Judul harus clickbait yang memancing rasa penasaran tanpa mengurangi keamanan konten. "
-            f"**HANYA BERIKAN SATU JUDUL BARU, TANPA PENJELASAN ATAU TEKS TAMBAKAH APAPUN.**\n\n"
-            f"Judul asli: '{original_title}'\n\n"
-            f"Judul baru:"
-        )
-        response = gemini_model_title.generate_content(prompt)
-        edited_title = response.text.strip()
-        if edited_title.startswith('"') and edited_title.endswith('"'):
-            edited_title = edited_title[1:-1]
-            
-        print(f"✅ Gemini AI (Model Judul) selesai mengedit judul. Hasil: '{edited_title}'")
-        return edited_title
-    except Exception as e:
-        print(f"❌ Error saat mengedit judul dengan Gemini AI (Model Judul): {e}. Menggunakan judul asli.")
-        return original_title
+    print(f"⚠️ Gemini AI untuk pengeditan judul dinonaktifkan. Menggunakan judul asli.")
+    return original_title
 
+# Fungsi edit_first_300_words_with_gemini dinonaktifkan
 def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
-    words = full_text_content.split()
-    if len(words) < 50:
-        print(f"[{post_id}] Artikel terlalu pendek (<50 kata) untuk diedit oleh Gemini AI. Melewati pengeditan.")
-        return full_text_content
-    char_count_for_300_words = 0
-    word_count = 0
-    for i, word in enumerate(words):
-        if word_count < 300:
-            char_count_for_300_words += len(word)
-            if i < len(words) - 1:
-                char_count_for_300_words += 1
-            word_count += 1
-        else:
-            break
-            
-    char_count_for_300_words = min(char_count_for_300_words, len(full_text_content))
-    first_300_words_original_string = full_text_content[:char_count_for_300_words].strip()
-    rest_of_article_text = full_text_content[char_count_for_300_words:].strip()
-    print(f"🤖 Memulai pengeditan Gemini AI (Model Konten) untuk artikel ID: {post_id} - '{post_title}' ({len(first_300_words_original_string.split())} kata pertama)...")
-    try:
-        prompt = (
-            f"Saya ingin Anda menulis ulang paragraf pembuka dari sebuah cerita. "
-            f"Tujuannya adalah untuk membuat narasi yang mengalir, menarik perhatian pembaca, dan mempertahankan inti cerita asli, "
-            f"tetapi dengan gaya bahasa yang lebih halus dan sopan, menghindari bahasa yang eksplisit atau vulgar. "
-            f"Paragraf harus tetap panjangnya sekitar 300 kata dari teks asli, tetapi dengan kosakata dan struktur kalimat yang diubah secara signifikan. "
-            f"Gunakan gaya informal dan lugas. Pastikan tidak ada konten yang melanggar pedoman keamanan.\n\n"
-            f"Berikut adalah paragraf aslinya:\n\n"
-            f"{first_300_words_original_string}"
-            f"\n\nParagraf yang ditulis ulang:"
-        )
-        response = gemini_model_content.generate_content(prompt)
-        edited_text_from_gemini = response.text
-        print(f"✅ Gemini AI (Model Konten) selesai mengedit bagian pertama artikel ID: {post_id}.")
-        cleaned_edited_text = strip_html_and_divs(edited_text_from_gemini)
-        edited_paragraphs = cleaned_edited_text.split('\n\n')
-        if edited_paragraphs:
-            first_edited_paragraph = edited_paragraphs[0]
-            remaining_edited_text = "\n\n".join(edited_paragraphs[1:])
-            edited_text_with_more_tag = first_edited_paragraph + "[more]\n\n" + remaining_edited_text.strip()
-        else:
-            edited_text_with_more_tag = ""
-        final_combined_text = edited_text_with_more_tag.strip() + "\n\n" + rest_of_article_text.strip()
-        return strip_html_and_divs(final_combined_text)
-    except Exception as e:
-        print(f"❌ Error saat mengedit dengan Gemini AI (Model Konten) untuk artikel ID: {post_id} - {e}. Menggunakan teks asli untuk bagian ini.")
-        return full_text_content
+    print(f"⚠️ Gemini AI untuk pengeditan konten (300 kata pertama) dinonaktifkan. Menggunakan konten asli.")
+    return full_text_content
 
 # --- Fungsi untuk memuat dan menyimpan status postingan yang sudah diterbitkan ---
 def load_published_posts_state():
@@ -200,28 +139,57 @@ def publish_post_to_wordpress(wp_api_url, title, content_html, username, app_pas
         image_html = f'<p><img src="{random_image_url}" alt="{title}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"></p>'
         final_content_for_wp = image_html + "\n\n" + content_html
         print(f"🖼️ Gambar acak '{random_image_url}' ditambahkan ke artikel.")
+    
+    # --- Debugging: Cek Kredensial ---
+    if not username or not app_password:
+        print("❌ ERROR: WP_USERNAME atau WP_APP_PASSWORD tidak diatur dengan benar untuk proses publikasi.")
+        return None
+
     post_data = {
         'title': title,
         'content': final_content_for_wp,
         'status': post_status,
-        # Untuk WordPress.com, Anda mungkin perlu menambahkan parameter lain
-        # seperti 'slug' atau 'date' jika ingin lebih spesifik.
-        # Namun, biasanya mereka akan menghasilkan slug secara otomatis dari judul.
+        # Menambahkan slug secara eksplisit.
+        # WordPress.com biasanya membuat slug dari judul, tapi ini bisa membantu debug.
+        'slug': slugify(title)
     }
+    
     auth = requests.auth.HTTPBasicAuth(username, app_password)
     headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json' # Minta respons dalam format JSON secara eksplisit
     }
+
+    print("\n--- Debugging Detail Permintaan POST ---")
+    print(f"URL Target: {wp_api_url}")
+    print(f"Header: {json.dumps(headers, indent=2)}")
+    # Masking app_password untuk keamanan dalam log
+    print(f"Kredensial Auth: Username='{username}', App Password='{'*' * len(app_password) if app_password else 'N/A'}' (disensor)")
+    # Menampilkan sebagian kecil konten jika terlalu panjang
+    content_preview = post_data['content'][:500] + '...' if len(post_data['content']) > 500 else post_data['content']
+    print(f"Payload JSON (sebagian): {json.dumps({'title': post_data['title'], 'status': post_data['status'], 'slug': post_data['slug'], 'content_preview': content_preview}, indent=2)}")
+    print("---------------------------------------\n")
+
     try:
         response = requests.post(wp_api_url, headers=headers, json=post_data, auth=auth)
-        response.raise_for_status()
+        response.raise_for_status() # Ini akan memicu HTTPError untuk kode status 4xx/5xx
         result = response.json()
-        # WordPress.com API mengembalikan 'URL' (dengan huruf besar U) untuk link artikel
         print(f"✅ Artikel '{title}' berhasil diterbitkan ke WordPress! URL: {result.get('URL')}")
         return result
     except requests.exceptions.HTTPError as e:
         print(f"❌ HTTP Error saat memposting ke WordPress: {e}")
+        # Mencetak respons penuh dari server untuk analisis lebih lanjut
         print(f"Respons server: {response.text}")
+        # Coba parsing respons untuk error code/message spesifik dari WordPress.com
+        if response.text:
+            try:
+                error_details = response.json()
+                if 'code' in error_details:
+                    print(f"Kode Error WordPress: {error_details.get('code')}")
+                if 'message' in error_details:
+                    print(f"Pesan Error WordPress: {error_details.get('message')}")
+            except json.JSONDecodeError:
+                pass # Jika respons bukan JSON, abaikan
         return None
     except requests.exceptions.RequestException as e:
         print(f"❌ Terjadi kesalahan koneksi ke WordPress API: {e}")
@@ -308,7 +276,7 @@ if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress to WordPress publishing process...")
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
     print(f"🎯 Akan memposting ke WordPress TARGET: {WP_TARGET_API_URL}.")
-    print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN (menggunakan 1 API Key saja).")
+    print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DINONAKTIFKAN SEMENTARA.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
     print("📝 Akan menyisipkan tag <details> setelah 10 paragraf pertama dengan link 'Lanjut BAB 2'.")
 
@@ -339,10 +307,7 @@ if __name__ == '__main__':
         original_title = post_to_publish_data['title']
         original_content = post_to_publish_data['content']
 
-        # Ambil tanggal dari post_to_publish_data dan format ke YYYY/MM/DD
-        # Ini akan digunakan untuk prediksi URL karena Anda mengonfirmasi permalink berbasis tanggal
         post_date_str = post_to_publish_data['date']
-        # Mengubah 'Z' ke '+00:00' untuk kompatibilitas with fromisoformat
         post_datetime_obj = datetime.datetime.fromisoformat(post_date_str.replace('Z', '+00:00'))
         date_path = post_datetime_obj.strftime('%Y/%m/%d')
         print(f"🗓️ Tanggal untuk URL artikel: {date_path}")
@@ -355,6 +320,7 @@ if __name__ == '__main__':
         cleaned_formatted_content_before_gemini = strip_html_and_divs(content_no_anchors)
         content_after_replacements = replace_custom_words(cleaned_formatted_content_before_gemini)
 
+        # Gemini AI dinonaktifkan di sini
         final_edited_title = edit_title_with_gemini(
             title_after_replacements
         )
@@ -368,11 +334,8 @@ if __name__ == '__main__':
         # PREDIKSI URL ARTIKEL YANG AKAN TERBIT
         post_slug = slugify(final_edited_title)
         
-        # Base URL untuk WordPress.com Anda
-        # Ini adalah domain dasar blog Anda, "https://ekstracrot.wordpress.com"
         base_target_url_for_permalink = "https://ekstracrot.wordpress.com"
 
-        # Gabungkan base URL, tanggal, dan slug
         predicted_article_url = f"{base_target_url_for_permalink}/{date_path}/{post_slug}/"
         print(f"🔗 Memprediksi URL artikel target: {predicted_article_url}")
 
