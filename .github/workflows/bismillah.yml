@@ -1,0 +1,70 @@
+name: Publish Daily WordPress Article 🚀
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC (7:00 AM WIB)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  publish_article:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ⬇️ Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        # Penting: Checkout dengan token yang memiliki izin push
+        # GITHUB_TOKEN memiliki izin ini secara default untuk private repos
+        token: ${{ secrets.GITHUB_TOKEN }} 
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: 📦 Install Dependencies
+      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+        python -m pip install --upgrade pip
+        pip install requests google-generativeai markdown --upgrade
+
+    - name: 🖼️ Prepare Random Images List (if applicable)
+      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+        if [ ! -f random_images.json ]; then
+          echo "[]" > random_images.json
+          echo "::warning::random_images.json not found. Creating an empty one. Add your image URLs there!"
+        fi
+        
+    - name: 📄 Ensure State File Exists
+      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+        if [ ! -f artikel_terbit.json ]; then
+          echo "[]" > artikel_terbit.json
+          echo "::notice::artikel_terbit.json not found. Creating an empty one for the first run."
+        fi
+
+    - name: 🚀 Run Article Publisher Script
+      env:
+        GEMINI_API_KEY_CONTENT: ${{ secrets.GEMINI_API_KEY_CONTENT }}
+        GEMINI_API_KEY_TITLE: ${{ secrets.GEMINI_API_KEY_TITLE }}
+        WP_USERNAME: ${{ secrets.WP_USERNAME }}
+        WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+        python ekstracrot.py # Ganti 'your_script_name.py' dengan nama file Python Anda
+
+    - name: 🔄 Commit and Push Updated Published State
+      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add artikel_terbit.json
+        # Perintah ini akan mencoba commit. Jika tidak ada perubahan, `|| true` akan mencegahnya gagal.
+        git commit -m "chore: Update artikel_terbit.json with new published post" || true
+        git push || true # Mencegah kegagalan jika tidak ada yang perlu di-push (misal: branch sudah up-to-date)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token bawaan GitHub untuk otentikasi push
+
+    # Opsional: Jika Anda masih ingin melihat artifact di UI GitHub Actions
+    - name: ⬆️ Upload Updated Published Posts State (for debugging)
+      uses: actions/upload-artifact@v4
+      with:
+        name: artikel-terbit-state
+        path: artikel_terbit.json
