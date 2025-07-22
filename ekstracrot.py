@@ -138,7 +138,7 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
     """
     Mengedit 300 kata pertama dari konten artikel menggunakan Gemini AI.
     Tujuannya adalah untuk membuat narasi yang lebih halus dan sopan.
-    Setelah itu, menyisipkan tag [more] untuk pemotongan di homepage.
+    Setelah itu, menyisipkan tag <!--more--> setelah paragraf pertama dari bagian yang diedit.
     """
     words = full_text_content.split()
     if len(words) < 50:
@@ -179,11 +179,26 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
         # Membersihkan teks hasil Gemini
         cleaned_edited_text = strip_html_and_divs(edited_text_from_gemini)
         
-        # Sisipkan tag [more] di sini untuk pemotongan di homepage
-        final_combined_text_with_more = cleaned_edited_text.strip() + "\n<!--more-->\n" + rest_of_article_text.strip()
+        # Pisahkan cleaned_edited_text menjadi paragraf
+        edited_paragraphs = cleaned_edited_text.split('\n\n')
         
-        # Pastikan tidak ada tag HTML yang tidak diinginkan setelah penggabungan
-        return strip_html_and_divs(final_combined_text_with_more)
+        content_with_more_tag = ""
+        if edited_paragraphs:
+            first_edited_paragraph = edited_paragraphs[0]
+            # Sisa paragraf dari bagian yang diedit
+            remaining_edited_paragraphs = "\n\n".join(edited_paragraphs[1:])
+            
+            # Sisipkan tag <!--more--> setelah paragraf pertama dari bagian yang diedit
+            content_with_more_tag = first_edited_paragraph + "\n<!--more-->\n" + remaining_edited_paragraphs.strip()
+        else:
+            # Fallback jika tidak ada paragraf yang diedit (seharusnya tidak terjadi dengan input yang valid)
+            content_with_more_tag = cleaned_edited_text.strip() + "\n<!--more-->\n" # Tambahkan <!--more--> di akhir jika tidak ada paragraf
+
+        # Gabungkan dengan sisa artikel asli
+        final_combined_text = content_with_more_tag.strip() + "\n\n" + rest_of_article_text.strip()
+        
+        # Pastikan tidak ada tag HTML yang tidak diinginkan setelah penggabungan akhir
+        return strip_html_and_divs(final_combined_text)
 
     except Exception as e:
         print(f"❌ Error saat mengedit dengan Gemini AI (Model Konten) untuk artikel ID: {post_id} - {e}. Menggunakan teks asli untuk bagian ini.")
@@ -352,7 +367,7 @@ def fetch_raw_posts():
     return all_posts_data
 
 # === Fungsi untuk menyisipkan tag <details> ===
-def insert_details_tag(content_text, paragraph_limit=10, article_url=None, article_title=None):
+def insert_details_tag(content_text, paragraph_limit=14, article_url=None, article_title=None):
     """
     Menyisipkan tag <details> setelah sejumlah paragraf tertentu.
     Ini berfungsi sebagai pengganti fungsionalitas 'read more' dengan link eksternal.
@@ -368,11 +383,13 @@ def insert_details_tag(content_text, paragraph_limit=10, article_url=None, artic
     encoded_article_url = ""
     encoded_article_title_for_display = ""
     if article_url and article_title:
-        encoded_article_url = quote_plus(article_url)
+        # Pastikan article_url tidak memiliki trailing slash sebelum di-encode
+        clean_article_url = article_url.rstrip('/') 
+        encoded_article_url = quote_plus(clean_article_url)
         encoded_article_title_for_display = article_title.replace('"', '&quot;')
 
-    details_tag_start = f'<details><summary><a href="https://lanjutbabdua.github.io/lanjut.html?url={encoded_article_url}#2" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary>\n'
-    details_tag_end = '\n</details>'
+    details_tag_start = f'<details><summary><a href="https://lanjutbabdua.github.io/lanjut.html?url={encoded_article_url}#lanjut" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary><h4>CHAPTER DUA</h4><div id="lanjut">\n'
+    details_tag_end = '\n</div></details>'
     return first_part + '\n\n' + details_tag_start + rest_part + details_tag_end
 
 # === Eksekusi Utama ===
@@ -381,8 +398,8 @@ if __name__ == '__main__':
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
     print(f"🎯 Akan memposting ke WordPress TARGET via XML-RPC: {WP_TARGET_API_URL} dengan Blog ID: {WP_BLOG_ID}.")
     print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
-    print("📝 Tag [more] akan disisipkan untuk pemotongan di homepage.")
-    print("📝 Tag <details> akan disisipkan di dalam artikel untuk link 'Lanjut BAB 2'.")
+    print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama dari bagian yang diedit untuk pemotongan di homepage.")
+    print("📝 Tag <details> akan disisipkan di dalam artikel setelah 14 paragraf untuk link 'Lanjut BAB 2'.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
 
     try:
@@ -431,7 +448,7 @@ if __name__ == '__main__':
             title_after_replacements
         )
 
-        # Panggil Gemini AI untuk mengedit 300 kata pertama konten dan menyisipkan [more]
+        # Panggil Gemini AI untuk mengedit 300 kata pertama konten dan menyisipkan <!--more-->
         final_processed_content_text = edit_first_300_words_with_gemini(
             original_id,
             final_edited_title,
@@ -444,14 +461,14 @@ if __name__ == '__main__':
         # Base URL untuk WordPress.com Anda
         base_target_url_for_permalink = "https://ekstracrot.wordpress.com"
 
-        # Gabungkan base URL, tanggal, dan slug
-        predicted_article_url = f"{base_target_url_for_permalink}/{post_datetime_obj.strftime('%Y')}/{post_datetime_obj.strftime('%m')}/{post_slug}/"
+        # Gabungkan base URL, tahun, bulan, dan slug (TANPA TRAILING SLASH DI SINI)
+        predicted_article_url = f"{base_target_url_for_permalink}/{post_datetime_obj.strftime('%Y')}/{post_datetime_obj.strftime('%m')}/{post_slug}" # <-- Perubahan di sini!
         print(f"🔗 Memprediksi URL artikel target: {predicted_article_url}")
 
         # === Sisipkan tag <details> setelah konten diedit (ini untuk di dalam artikel penuh) ===
         content_with_details_tag = insert_details_tag(
             final_processed_content_text,
-            paragraph_limit=10,
+            paragraph_limit=14,
             article_url=predicted_article_url,
             article_title=final_edited_title
         )
