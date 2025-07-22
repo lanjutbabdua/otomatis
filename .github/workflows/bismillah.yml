@@ -24,19 +24,20 @@ jobs:
         python-version: '3.x'
 
     - name: 📦 Install Dependencies
-      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+      run: |
         python -m pip install --upgrade pip
-        pip install requests google-generativeai markdown --upgrade
+        # Tambahkan 'python-wordpress-xmlrpc' sebagai dependensi baru
+        pip install requests google-generativeai markdown python-wordpress-xmlrpc --upgrade
 
     - name: 🖼️ Prepare Random Images List (if applicable)
-      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+      run: |
         if [ ! -f random_images.json ]; then
           echo "[]" > random_images.json
           echo "::warning::random_images.json not found. Creating an empty one. Add your image URLs there!"
         fi
         
     - name: 📄 Ensure State File Exists
-      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+      run: |
         if [ ! -f artikel_terbit.json ]; then
           echo "[]" > artikel_terbit.json
           echo "::notice::artikel_terbit.json not found. Creating an empty one for the first run."
@@ -45,14 +46,14 @@ jobs:
     - name: 🚀 Run Article Publisher Script
       env:
         GEMINI_API_KEY_CONTENT: ${{ secrets.GEMINI_API_KEY_CONTENT }}
-        GEMINI_API_KEY_TITLE: ${{ secrets.GEMINI_API_KEY_TITLE }}
+        # Hapus GEMINI_API_KEY_TITLE karena sekarang hanya menggunakan satu key
         WP_USERNAME: ${{ secrets.WP_USERNAME }}
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
-        python ekstracrot.py # Ganti 'your_script_name.py' dengan nama file Python Anda
+      run: |
+        python ekstracrot.py # Pastikan nama file Python Anda benar
 
     - name: 🔄 Commit and Push Updated Published State
-      run: | # <--- ENSURE THIS 'run:' IS INDENTED EXACTLY LIKE THIS
+      run: |
         git config user.name "GitHub Actions Bot"
         git config user.email "actions@github.com"
         git add artikel_terbit.json
