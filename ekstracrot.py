@@ -26,6 +26,9 @@ WP_BLOG_ID = "137050535"
 STATE_FILE = 'artikel_terbit.json'
 RANDOM_IMAGES_FILE = 'random_images.json'
 
+# --- DEFAULT TAGS ---
+DEFAULT_TAGS = ["Cerita Dewasa", "Cerita Seks", "Cerita Sex", "Cerita Ngentot"] # <-- Default tags yang akan ditambahkan
+
 # --- Konfigurasi Gemini API (Satu Key Saja) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
 if not GEMINI_API_KEY:
@@ -239,7 +242,7 @@ def get_random_image_url(image_urls):
     return None
 
 # --- Fungsi yang Dimodifikasi untuk Mengirim Post ke WordPress Target Menggunakan XML-RPC ---
-def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, username, app_password, random_image_url=None, post_status='publish'):
+def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, username, app_password, random_image_url=None, post_status='publish', tags=None):
     """
     Menerbitkan artikel ke WordPress.com menggunakan XML-RPC API.
     Menambahkan gambar acak di awal konten jika tersedia.
@@ -268,6 +271,14 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
         post.post_status = post_status
         post.slug = slugify(title) # XML-RPC juga mendukung slug
 
+        # --- Tambahkan Tags di sini ---
+        if tags:
+            post.terms_names = {
+                'post_tag': tags
+            }
+            print(f"🏷️ Menambahkan tag: {', '.join(tags)}")
+        # ---------------------------
+
         # Debugging payload
         print("\n--- Debugging Detail Payload XML-RPC ---")
         print(f"URL XML-RPC: {wp_xmlrpc_url}")
@@ -276,6 +287,8 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
         print(f"Title: {post.title}")
         print(f"Status: {post.post_status}")
         print(f"Slug: {post.slug}")
+        if tags:
+            print(f"Tags: {post.terms_names.get('post_tag')}")
         content_preview = post.content[:500] + '...' if len(post.content) > 500 else post.content
         print(f"Content Preview (sebagian): {content_preview}")
         print("---------------------------------------\n")
@@ -390,6 +403,7 @@ if __name__ == '__main__':
     print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
+    print(f"🏷️ Tag default yang akan ditambahkan: {', '.join(DEFAULT_TAGS)}")
 
     try:
         published_ids = load_published_posts_state()
@@ -473,7 +487,8 @@ if __name__ == '__main__':
             final_post_content_html,
             WP_USERNAME,
             WP_APP_PASSWORD,
-            random_image_url=selected_random_image
+            random_image_url=selected_random_image,
+            tags=DEFAULT_TAGS # <-- Baris ini yang menambahkan default tags
         )
         
         if published_result:
