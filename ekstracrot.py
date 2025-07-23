@@ -13,23 +13,20 @@ from urllib.parse import quote_plus
 # Impor library XML-RPC
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods.posts import NewPost
-from wordpress_xmlrpc.methods.media import UploadFile # Diimpor, tapi tidak digunakan untuk upload langsung di sini
+from wordpress_xmlrpc.methods.media import UploadFile
 
 # --- Konfigurasi ---
 API_SOURCE_URL = "https://kisah69.blog/wp-json/wp/v2/posts"
-# Ganti WP_TARGET_API_URL untuk XML-RPC
 WP_TARGET_API_URL = "https://ekstracrot.wordpress.com/xmlrpc.php"
-# ID Blog untuk WordPress.com (perlu untuk XML-RPC pada public-api)
-# Untuk ekstracrot.wordpress.com, ID situsnya adalah 137050535
 WP_BLOG_ID = "137050535" 
 
 STATE_FILE = 'artikel_terbit.json'
 RANDOM_IMAGES_FILE = 'random_images.json'
 
 # --- DEFAULT TAGS ---
-DEFAULT_TAGS = ["Cerita Dewasa", "Cerita Seks", "Cerita Sex", "Cerita Ngentot"] # <-- Default tags yang akan ditambahkan
+DEFAULT_TAGS = ["Cerita Dewasa", "Cerita Seks", "Cerita Sex", "Cerita Ngentot"]
 
-# --- Konfigurasi Gemini API (Satu Key Saja) ---
+# --- Konfigurasi Gemini API ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY_CONTENT environment variable not set. Please set it in your GitHub Secrets or local environment.")
@@ -55,7 +52,11 @@ REPLACEMENT_MAP = {
     "sex": "bercinta"
 }
 
-# === Utilitas ===
+---
+
+### **Utilitas dan Fungsi Pembantu**
+
+```python
 def extract_first_image_url(html_content):
     """
     Mengekstrak URL gambar pertama dari konten HTML.
@@ -69,11 +70,14 @@ def strip_html_and_divs(html):
     """
     Menghapus tag HTML (termasuk <div>) dan gambar, 
     mengganti </p> dengan newline ganda, dan membersihkan spasi berlebih.
+    Ini adalah versi yang MENGHAPUS SEMUA TAG HTML, termasuk komentar.
     """
     html_with_newlines = re.sub(r'</p>', r'\n\n', html, flags=re.IGNORECASE)
     html_no_images = re.sub(r'<img[^>]*>', '', html_with_newlines)
     html_no_divs = re.sub(r'</?div[^>]*>', '', html_no_images, flags=re.IGNORECASE)
-    clean_text = re.sub('<[^<]+?>', '', html_no_divs)
+    
+    # Regex ini menghapus semua tag HTML, termasuk komentar seperti clean_text = re.sub('<[^<]+?>', '', html_no_divs) 
+    
     clean_text = re.sub(r'\n{3,}', r'\n\n', clean_text).strip()
     return clean_text
 
@@ -113,6 +117,11 @@ def replace_custom_words(text):
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
 
+---
+
+### **Fungsi Utama Pengolahan Konten (tanpa sisipan `<!--more-->`)**
+
+```python
 def edit_title_with_gemini(original_title):
     """
     Mengedit judul menggunakan Gemini AI untuk membuatnya lebih menarik dan tidak vulgar.
@@ -126,7 +135,7 @@ def edit_title_with_gemini(original_title):
             f"Judul asli: '{original_title}'\n\n"
             f"Judul baru:"
         )
-        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt) # Menggunakan gemini_model_title langsung
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
         edited_title = response.text.strip()
         if edited_title.startswith('"') and edited_title.endswith('"'):
             edited_title = edited_title[1:-1]
@@ -141,7 +150,7 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
     """
     Mengedit 300 kata pertama dari konten artikel menggunakan Gemini AI.
     Tujuannya adalah untuk membuat narasi yang lebih halus dan sopan.
-    Setelah itu, akan menyisipkan <!--more--> setelah paragraf pertama.
+    Fungsi ini TIDAK menyisipkan <!--more-->.
     """
     words = full_text_content.split()
     if len(words) < 50:
@@ -175,40 +184,28 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
             f"{first_300_words_original_string}"
             f"\n\nParagraf yang ditulis ulang:"
         )
-        response = gemini_model_content.generate_content(prompt)
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
         edited_text_from_gemini = response.text
         print(f"✅ Gemini AI (Model Konten) selesai mengedit bagian pertama artikel ID: {post_id}.")
         
-        # Membersihkan teks hasil Gemini
-        cleaned_edited_text = strip_html_and_divs(edited_text_from_gemini)
+        # Membersihkan teks hasil Gemini. strip_html_and_divs akan menghapus <!--more--> jika ada dari Gemini.
+        cleaned_edited_text_from_gemini = strip_html_and_divs(edited_text_from_gemini)
         
-        # --- PERUBAHAN UTAMA DIMULAI DI SINI ---
-        # Pisahkan hasil edit Gemini menjadi paragraf-paragraf
-        gemini_paragraphs = cleaned_edited_text.split('\n\n')
+        # Gabungkan hasil edit Gemini dengan sisa artikel asli
+        final_combined_text = cleaned_edited_text_from_gemini.strip() + "\n\n" + rest_of_article_text.strip()
         
-        # Ambil paragraf pertama
-        first_gemini_paragraph = gemini_paragraphs[0].strip()
-        
-        # Gabungkan paragraf pertama dengan tag <!--more-->
-        # INGAT: Anda harus mengubah ini kembali ke '' di file Anda setelah menyalin!
-        content_after_more_tag = first_gemini_paragraph + '\n\n<!--more-->\n\n'
-        
-        # Tambahkan sisa paragraf dari hasil edit Gemini (jika ada)
-        if len(gemini_paragraphs) > 1:
-            content_after_more_tag += "\n\n".join(gemini_paragraphs[1:]).strip()
-            
-        # Gabungkan dengan sisa artikel asli
-        final_combined_text = content_after_more_tag + "\n\n" + rest_of_article_text.strip()
-        # --- PERUBAHAN UTAMA BERAKHIR DI SINI ---
-        
-        # Pastikan tidak ada tag HTML yang tidak diinginkan setelah penggabungan akhir
-        return strip_html_and_divs(final_combined_text)
+        # Panggil strip_html_and_divs lagi untuk membersihkan sisa HTML dari penggabungan, dll.
+        return strip_html_and_divs(final_combined_text) 
 
     except Exception as e:
         print(f"❌ Error saat mengedit dengan Gemini AI (Model Konten) untuk artikel ID: {post_id} - {e}. Menggunakan teks asli untuk bagian ini.")
         return full_text_content
 
-# --- Fungsi untuk memuat dan menyimpan status postingan yang sudah diterbitkan ---
+---
+
+### **Fungsi Manajemen State dan Gambar**
+
+```python
 def load_published_posts_state():
     """
     Memuat ID postingan yang sudah diterbitkan dari file status.
@@ -258,7 +255,67 @@ def get_random_image_url(image_urls):
         return random.choice(image_urls)
     return None
 
-# --- Fungsi yang Dimodifikasi untuk Mengirim Post ke WordPress Target Menggunakan XML-RPC ---
+---
+
+### **Fungsi Sisipan Tag Khusus (`<details>`)**
+
+```python
+def insert_details_tag(content_text, article_url=None, article_title=None):
+    """
+    Menyisipkan tag <details> di tengah-tengah total paragraf yang ada.
+    """
+    paragraphs = content_text.split('\n\n')
+    total_paragraphs = len(paragraphs)
+    
+    if total_paragraphs < 2: 
+        return content_text
+
+    paragraph_insert_index = total_paragraphs // 2 
+    
+    first_part = "\n\n".join(paragraphs[:paragraph_insert_index])
+    rest_part = "\n\n".join(paragraphs[paragraph_insert_index:])
+
+    encoded_article_url = ""
+    encoded_article_title_for_display = ""
+    if article_url and article_title:
+        clean_article_url = article_url.rstrip('/') 
+        encoded_article_url = quote_plus(clean_article_url)
+        encoded_article_title_for_display = article_title.replace('"', '&quot;')
+
+    details_tag_start = f'<details><summary><a href="https://lanjutbabdua.github.io/lanjut.html?url={encoded_article_url}#lanjut" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary><h4>CHAPTER DUA</h4><div id="lanjut">\n'
+    details_tag_end = '\n</div></details>'
+    
+    print(f"📝 Tag <details> akan disisipkan setelah paragraf ke-{paragraph_insert_index} (total {total_paragraphs} paragraf).")
+    return first_part + '\n\n' + details_tag_start + rest_part + details_tag_end
+
+---
+
+### **Fungsi BARU: Sisipkan `<!--more-->` Tepat Sebelum Pengiriman**
+
+```python
+def add_more_tag_before_send(content_text):
+    """
+    Menyisipkan tag <!--more--> setelah paragraf pertama dari konten yang sudah final.
+    Ini dipanggil di akhir proses, sebelum konversi ke HTML untuk pengiriman.
+    """
+    paragraphs = content_text.split('\n\n')
+    
+    if not paragraphs or not paragraphs[0].strip():
+        print("⚠️ Konten terlalu pendek atau paragraf pertama kosong. Tidak menyisipkan <!--more-->.")
+        return content_text
+
+    first_paragraph = paragraphs[0].strip()
+    rest_of_content = "\n\n".join(paragraphs[1:]).strip() # Gabungkan sisa paragraf
+
+    content_with_more_tag = first_paragraph + '\n\n<!--more-->\n\n' + rest_of_content
+    print("📝 Tag <!--more--> disisipkan setelah paragraf pertama (di tahap akhir).")
+    return content_with_more_tag
+
+---
+
+### **Fungsi Publikasi ke WordPress**
+
+```python
 def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, username, app_password, random_image_url=None, post_status='publish', tags=None):
     """
     Menerbitkan artikel ke WordPress.com menggunakan XML-RPC API.
@@ -272,31 +329,25 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
         final_content_for_wp = image_html + "\n\n" + content_html
         print(f"🖼️ Gambar acak '{random_image_url}' ditambahkan ke artikel.")
 
-    # --- Debugging: Cek Kredensial ---
     if not username or not app_password:
         print("❌ ERROR: WP_USERNAME atau WP_APP_PASSWORD tidak diatur dengan benar untuk proses publikasi.")
         return None
 
     try:
-        # Inisialisasi klien XML-RPC
         client = Client(wp_xmlrpc_url, username, app_password)
         
-        # Membuat objek post
         post = WordPressPost()
         post.title = title
         post.content = final_content_for_wp
         post.post_status = post_status
-        post.slug = slugify(title) # XML-RPC juga mendukung slug
+        post.slug = slugify(title)
 
-        # --- Tambahkan Tags di sini ---
         if tags:
             post.terms_names = {
                 'post_tag': tags
             }
             print(f"🏷️ Menambahkan tag: {', '.join(tags)}")
-        # ---------------------------
 
-        # Debugging payload
         print("\n--- Debugging Detail Payload XML-RPC ---")
         print(f"URL XML-RPC: {wp_xmlrpc_url}")
         print(f"Blog ID: {blog_id}")
@@ -310,24 +361,23 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
         print(f"Content Preview (sebagian): {content_preview}")
         print("---------------------------------------\n")
 
-        # Mengirim post baru
-        # Catatan: Untuk WordPress.com, metode NewPost memerlukan blog_id sebagai argumen pertama
         post_id = client.call(NewPost(post, blog_id=blog_id))
         
-        # XML-RPC NewPost biasanya hanya mengembalikan ID, bukan URL.
-        # URL akan diprediksi di main loop.
         print(f"✅ Artikel '{title}' berhasil diterbitkan ke WordPress via XML-RPC! Post ID: {post_id}")
-        return {'id': post_id, 'URL': None} # URL akan diprediksi di main loop
+        return {'id': post_id, 'URL': None}
 
     except Exception as e:
         print(f"❌ Terjadi kesalahan saat memposting ke WordPress via XML-RPC: {e}")
-        # Tangani error spesifik dari XML-RPC jika memungkinkan
         if hasattr(e, 'faultCode') and hasattr(e, 'faultString'):
             print(f"XML-RPC Fault Code: {e.faultCode}")
             print(f"XML-RPC Fault String: {e.faultString}")
         return None
 
-# === Ambil semua postingan dari WordPress Self-Hosted REST API (SUMBER) ===
+---
+
+### **Fungsi Ambil Post dari Sumber**
+
+```python
 def fetch_raw_posts():
     """
     Mengambil semua postingan yang diterbitkan dari WordPress sumber menggunakan REST API.
@@ -380,49 +430,20 @@ def fetch_raw_posts():
             break
     return all_posts_data
 
-# === Fungsi untuk menyisipkan tag <details> ===
-def insert_details_tag(content_text, article_url=None, article_title=None): # Menghapus paragraph_limit dari argumen
-    """
-    Menyisipkan tag <details> di tengah-tengah total paragraf yang ada.
-    Ini berfungsi sebagai pengganti fungsionalitas 'read more' dengan link eksternal.
-    """
-    paragraphs = content_text.split('\n\n')
-    total_paragraphs = len(paragraphs)
-    
-    if total_paragraphs < 2: # Jika kurang dari 2 paragraf, tidak perlu sisipkan details tag
-        return content_text
+---
 
-    # Hitung posisi tengah (bulatkan ke bawah)
-    paragraph_insert_index = total_paragraphs // 2 
-    
-    first_part = "\n\n".join(paragraphs[:paragraph_insert_index])
-    rest_part = "\n\n".join(paragraphs[paragraph_insert_index:])
+### **Eksekusi Utama**
 
-    encoded_article_url = ""
-    encoded_article_title_for_display = ""
-    if article_url and article_title:
-        # Pastikan article_url tidak memiliki trailing slash sebelum di-encode
-        clean_article_url = article_url.rstrip('/') 
-        encoded_article_url = quote_plus(clean_article_url)
-        encoded_article_title_for_display = article_title.replace('"', '&quot;')
-
-    details_tag_start = f'<details><summary><a href="https://lanjutbabdua.github.io/lanjut.html?url={encoded_article_url}#lanjut" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary><h4>CHAPTER DUA</h4><div id="lanjut">\n'
-    details_tag_end = '\n</div></details>'
-    
-    print(f"📝 Tag <details> akan disisipkan setelah paragraf ke-{paragraph_insert_index} (total {total_paragraphs} paragraf).")
-    return first_part + '\n\n' + details_tag_start + rest_part + details_tag_end
-
-# === Eksekusi Utama ===
+```python
 if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress to WordPress publishing process...")
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
     print(f"🎯 Akan memposting ke WordPress TARGET via XML-RPC: {WP_TARGET_API_URL} dengan Blog ID: {WP_BLOG_ID}.")
     print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
+    print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama TEPAT SEBELUM pengiriman ke WordPress.") # Update info
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
     print(f"🏷️ Tag default yang akan ditambahkan: {', '.join(DEFAULT_TAGS)}")
-    print("--- PENTING: Tag <!--more--> akan disisipkan setelah paragraf pertama dari konten yang diedit Gemini. ---")
-
 
     try:
         published_ids = load_published_posts_state()
@@ -451,7 +472,6 @@ if __name__ == '__main__':
         original_title = post_to_publish_data['title']
         original_content = post_to_publish_data['content']
 
-        # Ambil tanggal dari post_to_publish_data dan format ke YYYY/MM/DD
         post_date_str = post_to_publish_data['date']
         post_datetime_obj = datetime.datetime.fromisoformat(post_date_str.replace('Z', '+00:00'))
         date_path = post_datetime_obj.strftime('%Y/%m/%d')
@@ -465,39 +485,32 @@ if __name__ == '__main__':
         cleaned_formatted_content_before_gemini = strip_html_and_divs(content_no_anchors)
         content_after_replacements = replace_custom_words(cleaned_formatted_content_before_gemini)
 
-        # Panggil Gemini AI untuk mengedit judul
         final_edited_title = edit_title_with_gemini(
             title_after_replacements
         )
 
-        # Panggil Gemini AI untuk mengedit 300 kata pertama konten
         final_processed_content_text = edit_first_300_words_with_gemini(
             original_id,
             final_edited_title,
             content_after_replacements
         )
         
-        # PREDIKSI URL ARTIKEL YANG AKAN TERBIT
         post_slug = slugify(final_edited_title)
-        
-        # Base URL untuk WordPress.com Anda
         base_target_url_for_permalink = "https://ekstracrot.wordpress.com"
-
-        # Gabungkan base URL, tahun, bulan, dan slug (TANPA TRAILING SLASH DI SINI)
         predicted_article_url = f"{base_target_url_for_permalink}/{post_datetime_obj.strftime('%Y')}/{post_datetime_obj.strftime('%m')}/{post_slug}"
         print(f"🔗 Memprediksi URL artikel target: {predicted_article_url}")
 
-        # === Sisipkan tag <details> setelah konten diedit (ini untuk di dalam artikel penuh) ===
-        # Tidak perlu lagi mengirim paragraph_limit karena dihitung di dalam fungsi
         content_with_details_tag = insert_details_tag(
             final_processed_content_text,
             article_url=predicted_article_url,
             article_title=final_edited_title
         )
         
+        # --- LANGKAH KRUSIAL: Sisipkan <!--more--> Paling Akhir ---
+        final_content_before_html_conversion = add_more_tag_before_send(content_with_details_tag)
+
         # Konversi ke HTML untuk pengiriman ke WordPress
-        # XML-RPC biasanya menerima HTML, dan '\n\n' akan diinterpretasikan sebagai paragraf baru.
-        final_post_content_html = content_with_details_tag.replace('\n\n', '<p></p>')
+        final_post_content_html = final_content_before_html_conversion.replace('\n\n', '<p></p>')
 
         published_result = publish_post_to_wordpress(
             WP_TARGET_API_URL,
@@ -507,7 +520,7 @@ if __name__ == '__main__':
             WP_USERNAME,
             WP_APP_PASSWORD,
             random_image_url=selected_random_image,
-            tags=DEFAULT_TAGS # <-- Baris ini yang menambahkan default tags
+            tags=DEFAULT_TAGS 
         )
         
         if published_result:
