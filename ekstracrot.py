@@ -141,6 +141,7 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
     """
     Mengedit 300 kata pertama dari konten artikel menggunakan Gemini AI.
     Tujuannya adalah untuk membuat narasi yang lebih halus dan sopan.
+    Setelah itu, akan menyisipkan <!--more--> setelah paragraf pertama.
     """
     words = full_text_content.split()
     if len(words) < 50:
@@ -181,8 +182,24 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
         # Membersihkan teks hasil Gemini
         cleaned_edited_text = strip_html_and_divs(edited_text_from_gemini)
         
+        # --- PERUBAHAN UTAMA DIMULAI DI SINI ---
+        # Pisahkan hasil edit Gemini menjadi paragraf-paragraf
+        gemini_paragraphs = cleaned_edited_text.split('\n\n')
+        
+        # Ambil paragraf pertama
+        first_gemini_paragraph = gemini_paragraphs[0].strip()
+        
+        # Gabungkan paragraf pertama dengan tag <!--more-->
+        # INGAT: Anda harus mengubah ini kembali ke '' di file Anda setelah menyalin!
+        content_after_more_tag = first_gemini_paragraph + '\n\n<!--more-->\n\n'
+        
+        # Tambahkan sisa paragraf dari hasil edit Gemini (jika ada)
+        if len(gemini_paragraphs) > 1:
+            content_after_more_tag += "\n\n".join(gemini_paragraphs[1:]).strip()
+            
         # Gabungkan dengan sisa artikel asli
-        final_combined_text = cleaned_edited_text.strip() + "\n\n" + rest_of_article_text.strip()
+        final_combined_text = content_after_more_tag + "\n\n" + rest_of_article_text.strip()
+        # --- PERUBAHAN UTAMA BERAKHIR DI SINI ---
         
         # Pastikan tidak ada tag HTML yang tidak diinginkan setelah penggabungan akhir
         return strip_html_and_divs(final_combined_text)
@@ -404,6 +421,8 @@ if __name__ == '__main__':
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
     print(f"🏷️ Tag default yang akan ditambahkan: {', '.join(DEFAULT_TAGS)}")
+    print("--- PENTING: Tag <!--more--> akan disisipkan setelah paragraf pertama dari konten yang diedit Gemini. ---")
+
 
     try:
         published_ids = load_published_posts_state()
