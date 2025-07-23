@@ -52,10 +52,7 @@ REPLACEMENT_MAP = {
     "sex": "bercinta"
 }
 
-
-### **Utilitas dan Fungsi Pembantu**
-
-```python
+# Utilitas dan Fungsi Pembantu
 def extract_first_image_url(html_content):
     """
     Mengekstrak URL gambar pertama dari konten HTML.
@@ -116,11 +113,7 @@ def replace_custom_words(text):
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
 
----
-
-### **Fungsi Utama Pengolahan Konten (tanpa sisipan `<!--more-->`)**
-
-```python
+# Fungsi Utama Pengolahan Konten
 def edit_title_with_gemini(original_title):
     """
     Mengedit judul menggunakan Gemini AI untuk membuatnya lebih menarik dan tidak vulgar.
@@ -200,11 +193,7 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
         print(f"❌ Error saat mengedit dengan Gemini AI (Model Konten) untuk artikel ID: {post_id} - {e}. Menggunakan teks asli untuk bagian ini.")
         return full_text_content
 
----
-
-### **Fungsi Manajemen State dan Gambar**
-
-```python
+# Fungsi Manajemen State dan Gambar
 def load_published_posts_state():
     """
     Memuat ID postingan yang sudah diterbitkan dari file status.
@@ -254,11 +243,7 @@ def get_random_image_url(image_urls):
         return random.choice(image_urls)
     return None
 
----
-
-### **Fungsi Sisipan Tag Khusus (`<details>`)**
-
-```python
+# Fungsi Sisipan Tag Khusus (<details>)
 def insert_details_tag(content_text, article_url=None, article_title=None):
     """
     Menyisipkan tag <details> di tengah-tengah total paragraf yang ada.
@@ -287,11 +272,7 @@ def insert_details_tag(content_text, article_url=None, article_title=None):
     print(f"📝 Tag <details> akan disisipkan setelah paragraf ke-{paragraph_insert_index} (total {total_paragraphs} paragraf).")
     return first_part + '\n\n' + details_tag_start + rest_part + details_tag_end
 
----
-
-### **Fungsi BARU: Sisipkan `<!--more-->` Tepat Sebelum Pengiriman**
-
-```python
+# Fungsi BARU: Sisipkan <!--more--> Tepat Sebelum Pengiriman
 def add_more_tag_before_send(content_text):
     """
     Menyisipkan tag <!--more--> setelah paragraf pertama dari konten yang sudah final.
@@ -310,11 +291,7 @@ def add_more_tag_before_send(content_text):
     print("📝 Tag <!--more--> disisipkan setelah paragraf pertama (di tahap akhir).")
     return content_with_more_tag
 
----
-
-### **Fungsi Publikasi ke WordPress**
-
-```python
+# Fungsi Publikasi ke WordPress
 def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, username, app_password, random_image_url=None, post_status='publish', tags=None):
     """
     Menerbitkan artikel ke WordPress.com menggunakan XML-RPC API.
@@ -372,10 +349,7 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
             print(f"XML-RPC Fault String: {e.faultString}")
         return None
 
-
-### **Fungsi Ambil Post dari Sumber**
-
-```python
+# Fungsi Ambil Post dari Sumber
 def fetch_raw_posts():
     """
     Mengambil semua postingan yang diterbitkan dari WordPress sumber menggunakan REST API.
@@ -428,17 +402,14 @@ def fetch_raw_posts():
             break
     return all_posts_data
 
-
-### **Eksekusi Utama**
-
-```python
+# Eksekusi Utama
 if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress to WordPress publishing process...")
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
     print(f"🎯 Akan memposting ke WordPress TARGET via XML-RPC: {WP_TARGET_API_URL} dengan Blog ID: {WP_BLOG_ID}.")
     print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
-    print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama TEPAT SEBELUM pengiriman ke WordPress.") # Update info
+    print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama TEPAT SEBELUM pengiriman ke WordPress.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
     print(f"🏷️ Tag default yang akan ditambahkan: {', '.join(DEFAULT_TAGS)}")
 
@@ -503,7 +474,7 @@ if __name__ == '__main__':
             article_title=final_edited_title
         )
         
-        # --- LANGKAH KRUSIAL: Sisipkan <!--more--> Paling Akhir 
+        # LANGKAH KRUSIAL: Sisipkan <!--more--> Paling Akhir
         final_content_before_html_conversion = add_more_tag_before_send(content_with_details_tag)
 
         # Konversi ke HTML untuk pengiriman ke WordPress
