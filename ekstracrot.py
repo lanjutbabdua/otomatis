@@ -373,7 +373,6 @@ def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, usern
             print(f"XML-RPC Fault String: {e.faultString}")
         return None
 
----
 
 ### **Fungsi Ambil Post dari Sumber**
 
@@ -430,7 +429,6 @@ def fetch_raw_posts():
             break
     return all_posts_data
 
----
 
 ### **Eksekusi Utama**
 
@@ -506,7 +504,7 @@ if __name__ == '__main__':
             article_title=final_edited_title
         )
         
-        # --- LANGKAH KRUSIAL: Sisipkan <!--more--> Paling Akhir ---
+        # --- LANGKAH KRUSIAL: Sisipkan <!--more--> Paling Akhir 
         final_content_before_html_conversion = add_more_tag_before_send(content_with_details_tag)
 
         # Konversi ke HTML untuk pengiriman ke WordPress
