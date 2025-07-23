@@ -6,7 +6,7 @@ import time
 import random
 import re
 import markdown
-import google.generativeai as genai
+# import google.generativeai as genai # Dinonaktifkan untuk menghemat token
 import unicodedata
 from urllib.parse import quote_plus
 
@@ -26,13 +26,13 @@ RANDOM_IMAGES_FILE = 'random_images.json'
 # --- DEFAULT TAGS ---
 DEFAULT_TAGS = ["Cerita Dewasa", "Cerita Seks", "Cerita Sex", "Cerita Ngentot"]
 
-# --- Konfigurasi Gemini API ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY_CONTENT environment variable not set. Please set it in your GitHub Secrets or local environment.")
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_model_content = genai.GenerativeModel("gemini-1.5-flash")
-gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")
+# --- Konfigurasi Gemini API (Dinonaktifkan) ---
+# GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
+# if not GEMINI_API_KEY:
+#     raise ValueError("GEMINI_API_KEY_CONTENT environment variable not set. Please set it in your GitHub Secrets or local environment.")
+# genai.configure(api_key=GEMINI_API_KEY)
+# gemini_model_content = genai.GenerativeModel("gemini-1.5-flash") # Tidak digunakan
+# gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")   # Tidak digunakan
 
 # --- Konfigurasi Kredensial WordPress Target ---
 WP_USERNAME = os.getenv('WP_USERNAME')
@@ -68,14 +68,17 @@ def strip_html_and_divs(html):
     mengganti </p> dengan newline ganda, dan membersihkan spasi berlebih.
     Ini adalah versi yang MENGHAPUS SEMUA TAG HTML, termasuk komentar.
     """
-    html_with_newlines = re.sub(r'</p>', r'\n\n', html, flags=re.IGNORECASE)
-    html_no_images = re.sub(r'<img[^>]*>', '', html_with_newlines)
-    html_no_divs = re.sub(r'</?div[^>]*>', '', html_no_images, flags=re.IGNORECASE)
+    if html is None:
+        html = ""
+
+    processed_text = re.sub(r'</p>', r'\n\n', html, flags=re.IGNORECASE)
+    processed_text = re.sub(r'<img[^>]*>', '', processed_text)
+    processed_text = re.sub(r'</?div[^>]*>', '', processed_text, flags=re.IGNORECASE)
     
-    # Regex ini menghapus semua tag HTML, termasuk komentar seperti clean_text = re.sub('<[^<]+?>', '', html_no_divs) 
+    processed_text = re.sub('<[^<]+?>', '', processed_text) 
     
-    clean_text = re.sub(r'\n{3,}', r'\n\n', clean_text).strip()
-    return clean_text
+    processed_text = re.sub(r'\n{3,}', r'\n\n', processed_text).strip()
+    return processed_text
 
 def remove_anchor_tags(html_content):
     """
@@ -113,85 +116,27 @@ def replace_custom_words(text):
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
 
-# Fungsi Utama Pengolahan Konten
+# Fungsi Utama Pengolahan Konten (Gemini Dinonaktifkan)
 def edit_title_with_gemini(original_title):
     """
     Mengedit judul menggunakan Gemini AI untuk membuatnya lebih menarik dan tidak vulgar.
+    Fungsi ini sekarang dinonaktifkan dan akan mengembalikan judul asli.
     """
-    print(f"🤖 Memulai pengeditan judul dengan Gemini AI (Model Judul): '{original_title}'...")
-    try:
-        prompt = (
-            f"Saya membutuhkan satu judul baru yang lebih menarik, tidak vulgar, dan tetap relevan dengan topik aslinya dan menggunakan kata Cerita Dewasa kedalamnya. "
-            f"Judul harus clickbait yang memancing rasa penasaran tanpa mengurangi keamanan konten. "
-            f"**HANYA BERIKAN SATU JUDUL BARU, TANPA PENJELASAN ATAU TEKS TAMBAKAH APAPUN.**\n\n"
-            f"Judul asli: '{original_title}'\n\n"
-            f"Judul baru:"
-        )
-        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
-        edited_title = response.text.strip()
-        if edited_title.startswith('"') and edited_title.endswith('"'):
-            edited_title = edited_title[1:-1]
-            
-        print(f"✅ Gemini AI (Model Judul) selesai mengedit judul. Hasil: '{edited_title}'")
-        return edited_title
-    except Exception as e:
-        print(f"❌ Error saat mengedit judul dengan Gemini AI (Model Judul): {e}. Menggunakan judul asli.")
-        return original_title
+    print(f"🤖 Pengeditan judul oleh Gemini AI dinonaktifkan. Menggunakan judul asli: '{original_title}'")
+    return original_title # Mengembalikan judul asli tanpa memanggil Gemini API
 
 def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
     """
     Mengedit 300 kata pertama dari konten artikel menggunakan Gemini AI.
-    Tujuannya adalah untuk membuat narasi yang lebih halus dan sopan.
-    Fungsi ini TIDAK menyisipkan <!--more-->.
+    Fungsi ini sekarang dinonaktifkan dan akan mengembalikan konten asli.
     """
-    words = full_text_content.split()
-    if len(words) < 50:
-        print(f"[{post_id}] Artikel terlalu pendek (<50 kata) untuk diedit oleh Gemini AI. Melewati pengeditan.")
-        return full_text_content
-
-    char_count_for_300_words = 0
-    word_count = 0
-    for i, word in enumerate(words):
-        if word_count < 300:
-            char_count_for_300_words += len(word)
-            if i < len(words) - 1:
-                char_count_for_300_words += 1
-            word_count += 1
-        else:
-            break
-            
-    char_count_for_300_words = min(char_count_for_300_words, len(full_text_content))
-    first_300_words_original_string = full_text_content[:char_count_for_300_words].strip()
-    rest_of_article_text = full_text_content[char_count_for_300_words:].strip()
-
-    print(f"🤖 Memulai pengeditan Gemini AI (Model Konten) untuk artikel ID: {post_id} - '{post_title}' ({len(first_300_words_original_string.split())} kata pertama)...")
-    try:
-        prompt = (
-            f"Saya ingin Anda menulis ulang paragraf pembuka dari sebuah cerita. "
-            f"Tujuannya adalah untuk membuat narasi yang mengalir, menarik perhatian pembaca, dan mempertahankan inti cerita asli, "
-            f"tetapi dengan gaya bahasa yang lebih halus dan sopan, menghindari bahasa yang eksplisit atau vulgar. "
-            f"Paragraf harus tetap panjangnya sekitar 300 kata dari teks asli, tetapi dengan kosakata dan struktur kalimat yang diubah secara signifikan. "
-            f"Gunakan gaya informal dan lugas. Pastikan tidak ada konten yang melanggar pedoman keamanan.\n\n"
-            f"Berikut adalah paragraf aslinya:\n\n"
-            f"{first_300_words_original_string}"
-            f"\n\nParagraf yang ditulis ulang:"
-        )
-        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
-        edited_text_from_gemini = response.text
-        print(f"✅ Gemini AI (Model Konten) selesai mengedit bagian pertama artikel ID: {post_id}.")
-        
-        # Membersihkan teks hasil Gemini. strip_html_and_divs akan menghapus <!--more--> jika ada dari Gemini.
-        cleaned_edited_text_from_gemini = strip_html_and_divs(edited_text_from_gemini)
-        
-        # Gabungkan hasil edit Gemini dengan sisa artikel asli
-        final_combined_text = cleaned_edited_text_from_gemini.strip() + "\n\n" + rest_of_article_text.strip()
-        
-        # Panggil strip_html_and_divs lagi untuk membersihkan sisa HTML dari penggabungan, dll.
-        return strip_html_and_divs(final_combined_text) 
-
-    except Exception as e:
-        print(f"❌ Error saat mengedit dengan Gemini AI (Model Konten) untuk artikel ID: {post_id} - {e}. Menggunakan teks asli untuk bagian ini.")
-        return full_text_content
+    print(f"🤖 Pengeditan konten 300 kata pertama oleh Gemini AI dinonaktifkan untuk artikel ID: {post_id}.")
+    
+    # Tetap lakukan penggantian kata-kata khusus dan pembersihan HTML
+    content_after_replacements = replace_custom_words(full_text_content)
+    cleaned_content = strip_html_and_divs(content_after_replacements)
+    
+    return cleaned_content # Mengembalikan konten yang sudah dibersihkan/diganti kata, tanpa pengeditan AI
 
 # Fungsi Manajemen State dan Gambar
 def load_published_posts_state():
@@ -407,7 +352,7 @@ if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress to WordPress publishing process...")
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
     print(f"🎯 Akan memposting ke WordPress TARGET via XML-RPC: {WP_TARGET_API_URL} dengan Blog ID: {WP_BLOG_ID}.")
-    print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
+    print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DINONAKTIFKAN untuk menghemat token.") # Info update
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
     print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama TEPAT SEBELUM pengiriman ke WordPress.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
@@ -450,9 +395,9 @@ if __name__ == '__main__':
         title_after_replacements = replace_custom_words(original_title)
         
         content_no_anchors = remove_anchor_tags(original_content)
-        cleaned_formatted_content_before_gemini = strip_html_and_divs(content_no_anchors)
-        content_after_replacements = replace_custom_words(cleaned_formatted_content_before_gemini)
-
+        # cleaned_formatted_content_before_gemini = strip_html_and_divs(content_no_anchors) # Ini sudah dihandle di edit_first_300_words_with_gemini
+        
+        # Panggil fungsi edit yang sudah dinonaktifkan Gemini
         final_edited_title = edit_title_with_gemini(
             title_after_replacements
         )
@@ -460,7 +405,7 @@ if __name__ == '__main__':
         final_processed_content_text = edit_first_300_words_with_gemini(
             original_id,
             final_edited_title,
-            content_after_replacements
+            content_no_anchors # Masukkan content_no_anchors langsung ke sini
         )
         
         post_slug = slugify(final_edited_title)
