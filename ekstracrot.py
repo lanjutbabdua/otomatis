@@ -33,7 +33,7 @@ gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")
 WP_USERNAME = os.getenv('WP_USERNAME')
 WP_APP_PASSWORD = os.getenv('WP_APP_PASSWORD')
 if not WP_USERNAME or not WP_APP_PASSWORD:
-    raise ValueError("WP_USERNAME and WP_APP_PASSWORD environment variables not set for target WordPress. Please set them in GitHub Secrets.")
+    raise ValueError("WP_USERNAME dan WP_APP_PASSWORD environment variables not set for target WordPress. Please set them in GitHub Secrets.")
 
 REPLACEMENT_MAP = {
     "memek": "serambi lempit",
@@ -239,8 +239,10 @@ def add_more_tag_before_send(content_text):
 
     first_paragraph = paragraphs[0].strip()
     rest_of_content = "\n\n".join(paragraphs[1:]).strip()
+    
+    # Sisipkan placeholder <!--more-->
     content_with_more_tag = first_paragraph + '\n\n<!--more-->\n\n' + rest_of_content
-    print("📝 Tag <!--more--> disisipkan setelah paragraf pertama (di tahap akhir).")
+    print("📝 Placeholder <!--more--> disisipkan setelah paragraf pertama.")
     return content_with_more_tag
 
 def publish_post_to_wordpress(wp_xmlrpc_url, blog_id, title, content_html, username, app_password, random_image_url=None, post_status='publish', tags=None):
@@ -351,7 +353,7 @@ if __name__ == '__main__':
     print(f"🎯 Akan memposting ke WordPress TARGET via XML-RPC: {WP_TARGET_API_URL} dengan Blog ID: {WP_BLOG_ID}.")
     print("🤖 Fitur Pengeditan Judul dan Konten (300 kata pertama) oleh Gemini AI DIAKTIFKAN.")
     print("📝 Tag <details> akan disisipkan di dalam artikel di pertengahan total paragraf.")
-    print("📝 Tag <!--more--> akan disisipkan setelah paragraf pertama TEPAT SEBELUM pengiriman ke WordPress.")
+    print("📝 Placeholder <!--more--> akan disisipkan setelah paragraf pertama, dan ANDA perlu menggantinya secara manual menjadi tag HTML asli jika diperlukan.")
     print("🖼️ Mencoba menambahkan gambar acak di awal konten.")
     print(f"🏷️ Tag default yang akan ditambahkan: {', '.join(DEFAULT_TAGS)}")
 
@@ -415,20 +417,32 @@ if __name__ == '__main__':
             article_title=final_edited_title
         )
         
-        final_content_before_html_conversion = add_more_tag_before_send(content_with_details_tag)
+        # Panggil fungsi add_more_tag_before_send yang sekarang sudah menyisipkan <!--more-->
+        # Tidak ada lagi penggantian otomatis di sini; Anda yang akan menggantinya secara manual.
+        final_content_with_more_tag_placeholder = add_more_tag_before_send(content_with_details_tag)
 
-        final_post_content_html = final_content_before_html_conversion.replace('\n\n', '</p><p>').replace('<!--more-->', '')
+        # Konversi newline ganda menjadi tag <p>
+        final_post_content_html = final_content_with_more_tag_placeholder.replace('\n\n', '</p><p>')
+        
+        # Tambahkan <p> awal jika belum ada
         if not final_post_content_html.startswith('<p>'):
             final_post_content_html = '<p>' + final_post_content_html
+        
+        # Pastikan konten diakhiri dengan </p> (tanpa khawatir karena Anda yang akan menanganinya)
         if not final_post_content_html.endswith('</p>'):
             final_post_content_html = final_post_content_html + '</p>'
-
+        
+        # Tidak ada lagi re.sub untuk di sini karena Anda yang akan mengganti <!--more-->
+        
+        print("💡 Pratinjau Konten HTML Final (untuk cek <!--more--> placeholder):")
+        print(final_post_content_html[:500] + '...' if len(final_post_content_html) > 500 else final_post_content_html)
+        print("-------------------------------------------------------")
 
         published_result = publish_post_to_wordpress(
             WP_TARGET_API_URL,
             WP_BLOG_ID,
             final_edited_title,
-            final_post_content_html,
+            final_post_content_html, # Pastikan Anda sudah mengganti <!--more--> di sini sebelum eksekusi!
             WP_USERNAME,
             WP_APP_PASSWORD,
             random_image_url=selected_random_image,
