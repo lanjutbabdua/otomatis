@@ -224,8 +224,8 @@ def insert_details_tag(content_text, article_url=None, article_title=None):
         encoded_article_url = quote_plus(clean_article_url)
         encoded_article_title_for_display = article_title.replace('"', '&quot;')
 
-    details_tag_start = f'<details><summary><a href="https://lanjutbabdua.github.io/lanjut.html?url={encoded_article_url}#lanjut" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary><h4>CHAPTER DUA</h4><div id="lanjut">\n'
-    details_tag_end = '\n</div></details>'
+    details_tag_start = f'<details><summary><a href="https://tantemagz.github.io?url={encoded_article_url}#lanjut" rel="nofollow" target="_blank">Lanjut BAB 2: {encoded_article_title_for_display}</a></summary><h4>CHAPTER DUA</h4><div id="lanjut">\n'
+    details_tag_end = '\n</div></details><p>Similar wordpress.com site: <a href="https://gugutrut.wordpress.com/" target="_blank">Cerita Dewasa Hot Terbaru</a></p>'
     
     print(f"📝 Tag <details> akan disisipkan setelah paragraf ke-{paragraph_insert_index} (total {total_paragraphs} paragraf).")
     return first_part + '\n\n' + details_tag_start + rest_part + details_tag_end
