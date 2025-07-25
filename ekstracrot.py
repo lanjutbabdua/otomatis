@@ -15,7 +15,7 @@ from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods.posts import NewPost
 from wordpress_xmlrpc.methods.media import UploadFile
 
-# --- Konfigurasi ---
+# --- Konfigurasi 
 API_SOURCE_URL = "https://kisah69.blog/wp-json/wp/v2/posts"
 WP_TARGET_API_URL = "https://ekstracrot.wordpress.com/xmlrpc.php"
 WP_BLOG_ID = "137050535" 
@@ -23,10 +23,10 @@ WP_BLOG_ID = "137050535"
 STATE_FILE = 'artikel_terbit.json'
 RANDOM_IMAGES_FILE = 'random_images.json'
 
-# --- DEFAULT TAGS ---
+# --- DEFAULT TAGS 
 DEFAULT_TAGS = ["Cerita Dewasa", "Cerita Seks", "Cerita Sex", "Cerita Ngentot"]
 
-# --- Konfigurasi Gemini API ---
+# --- Konfigurasi Gemini API 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_CONTENT")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY_CONTENT environment variable not set. Please set it in your GitHub Secrets or local environment.")
@@ -34,13 +34,13 @@ genai.configure(api_key=GEMINI_API_KEY)
 gemini_model_content = genai.GenerativeModel("gemini-1.5-flash")
 gemini_model_title = genai.GenerativeModel("gemini-1.5-flash")
 
-# --- Konfigurasi Kredensial WordPress Target ---
+# --- Konfigurasi Kredensial WordPress Target 
 WP_USERNAME = os.getenv('WP_USERNAME')
 WP_APP_PASSWORD = os.getenv('WP_APP_PASSWORD')
 if not WP_USERNAME or not WP_APP_PASSWORD:
     raise ValueError("WP_USERNAME and WP_APP_PASSWORD environment variables not set for target WordPress. Please set them in GitHub Secrets.")
 
-# --- Penggantian Kata Khusus ---
+# --- Penggantian Kata Khusus 
 REPLACEMENT_MAP = {
     "memek": "serambi lempit",
     "kontol": "rudal",
@@ -116,9 +116,9 @@ def replace_custom_words(text):
         processed_text = pattern.sub(new_word, processed_text)
     return processed_text
 
----
+
 ## Fungsi Pengeditan Judul (Diperbarui)
----
+
 def edit_title_with_gemini(original_title, edited_first_300_words_context):
     """
     Mengedit judul menggunakan Gemini AI agar lebih menarik, tidak vulgar, dan
@@ -148,9 +148,9 @@ def edit_title_with_gemini(original_title, edited_first_300_words_context):
         print(f"❌ Error saat mengedit judul dengan Gemini AI (Model Judul): {e}. Menggunakan judul asli.")
         return original_title
 
----
+
 ## Fungsi Pengeditan Konten (Diperbarui untuk Mengembalikan Konteks)
----
+
 def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
     """
     Mengedit 300 kata pertama dari konten artikel menggunakan Gemini AI.
@@ -218,9 +218,9 @@ def edit_first_300_words_with_gemini(post_id, post_title, full_text_content):
         return cleaned_content, content_after_replacements[:char_count_for_300_words] # Mengembalikan bagian pertama dari yang sudah diganti kata (tanpa edit AI)
 
 
----
+
 ## Fungsi Manajemen State dan Gambar (Perbaikan `load_published_posts_state`)
----
+
 def load_published_posts_state():
     """
     Memuat ID postingan yang sudah diterbitkan dari file status.
@@ -281,9 +281,9 @@ def get_random_image_url(image_urls):
         return random.choice(image_urls)
     return None
 
----
+
 ## Fungsi Sisipan Tag Khusus dan Publikasi (Tidak Berubah Signifikan)
----
+
 # Fungsi Sisipan Tag Khusus (<details>)
 def insert_details_tag(content_text, article_url=None, article_title=None):
     """
@@ -443,9 +443,9 @@ def fetch_raw_posts():
             break
     return all_posts_data
 
----
+
 ## Eksekusi Utama (Alur Diperbarui)
----
+
 if __name__ == '__main__':
     print(f"[{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting WordPress to WordPress publishing process...")
     print(f"🚀 Mengambil artikel dari WordPress SUMBER: {API_SOURCE_URL}.")
